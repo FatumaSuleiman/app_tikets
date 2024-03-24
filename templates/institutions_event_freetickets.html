@@ -1,0 +1,352 @@
+{% extends 'base_layout.html' %} {% load static %} {% block title %} Events - Free Tickets
+{% endblock %} {% block additional_assets %}
+<script src="{% static '/js/vue.js' %}"></script>
+<script src="{% static '/js/axios.min.js' %}"></script>
+<script src="{% static '/js/ticketCategory.js' %}"></script>
+
+<link
+rel="stylesheet"
+type="text/css"
+href="{% static 'css/ticketCategory.css' %}"
+/>
+
+{% endblock %}
+{% block body %}
+
+<div class="row mx-1">
+  <div class="col-md-12">
+    <ul class="breadcrumb">
+      <li><a href="#">Home</a></li>
+      <li>Events For Free Tickets</li>
+    </ul>
+  </div>
+</div>
+<div id="free_ticket_div">
+  <div class="row">
+    <div class="col-md-12 ml-3">
+      <span class="text-success text-center text-sm"  v-show="successMessage!=''">[[this.successMessage]]</span>
+    </div>
+  </div>
+{% for event in events %}
+{% if event.data.active and event.free_ticket_category%}
+<div class="row mt-2">
+  <div class="col-md-12">
+    
+      <div class="bg-dark text-white text-center p-3 card-styles">
+       <div class="row">
+        <div class="col-md-8 col-sm-8">
+        <blockquote class="blockquote mb-0 text-white">
+          <div class="row"><div class="col-md-12 col-sm-12 col-12"><h2 class="text-white text-center">{{event.data.name}}</h2></div></div>
+          <div class="row"><div class="col-md-12 col-sm-12 col-12"><h5 class="text-white text-center">Venue: {{event.data.eventLocation}}</h5></div></div>
+          <footer class="blockquote-footer">
+            <small> {{event.data.date}} at {{event.data.time}}</small>
+          </footer>
+        </blockquote>
+      </div>
+      
+      <div class="col-md-4 col-sm-4">
+
+        <button
+                    id=""
+                    class="btn px-4 text-white buy_ticket"
+                    style="background-color: orange"
+                    data-toggle="modal"
+                    @click="setTicketData({{event.data.eventID}}, '{{institutionId}}','{{event.data.eventDevice}}','{{event.id}}')"
+                    data-target="#generateFreeTicketModal"
+                  >
+                  Generate Free Ticket
+                </button> 
+
+      </div>
+
+      </div>
+      
+
+      </div>
+  
+  </div>
+</div>
+
+
+<!-- Modal for generating free ticket-->
+
+<!-- Modal -->
+<div
+class="modal fade bg-dark"
+id="generateFreeTicketModal"
+tabindex="-1"
+role="dialog"
+aria-labelledby="addPhoneModalLabel"
+aria-hidden="true"
+>
+<!-- add 'modal-dialog-centered' class below to center the modal -->
+<div class="modal-dialog " role="document">
+  <div class="modal-content">
+    <div class="modal-body">
+    <div class="row">
+    <div class="col-md-8">
+    <label  class="mt-1" for="">Quantity</label>
+    <div  class="quantity buttons_added ml-4" class="">
+      <input type="button" value="-" class="minus">
+      <input id="quantity" type="number" step="1" min="1" value="1"  name="quantity" title="Qty" class="input-text qty text" size="4" pattern="" inputmode="" readonly>
+      <input type="button" value="+" class="plus">
+    </div>
+
+  </div>
+  </div>
+  
+    <div class="row">
+    <div class="col-md-6">  
+    <div class="mt-2 mb-1" id="userPhone">
+        <input
+          
+          id="sendTo"
+          class="form-control"
+          placeholder="Phone Number To Send Ticket to"
+          type="tel"
+          v-model="userNumber"
+          required
+          :maxlength="10"
+          v-on:keyup="checkErrorPhone"
+        />
+        
+      </div>
+    </div>
+
+     <div class="col-md-6">  
+      <div class="mt-2" id="userNames">
+          <input
+            
+            id="userNamesId"
+            class="form-control"
+            placeholder="Provide Names for whom you are generating ticket(s)"
+            type="text"
+            v-model="userNames"
+            required
+          />
+          
+        </div>
+      </div>
+
+      <div class="col-md-6">  
+        <div class="mt-2" id="userCategoryId">
+            
+
+
+            <select id="selectedCategoryId{{event.id}}" class="form-control" required>
+              <option value="">Please Select Free Category</option>
+              {%for c in event.free_ticket_category%}
+              <option value="{{c.data.category_id}}">{{c.data.name}}</option>
+              {%endfor%}
+              
+            </select>
+            
+          </div>
+        </div>
+
+
+    </div> 
+
+
+    
+
+      
+    </div>
+    <span class="text-danger text-center text-sm" v-show="errorMessage!=''">[[this.errorMessage]]</span>
+   <div class="">
+    <div class="row pb-2 px-4 mt-3">
+      <div class="col-md-6 col-sm-6 ">
+           <button type="button" class="btn btn-secondary mt--2 w-100" data-dismiss="modal">
+        Close
+      </button>
+      </div>
+      <div class="col-md-6 col-sm-6 ">
+        <button
+        id="generateFreeTicketId"
+        @click="generateFreeTicket()"
+        type="button"
+        class="btn text-white mt--2 w-100"
+        style="background-color: orange"
+      >
+        GENERATE
+      </button>
+      </div>
+   
+      
+    </div>
+  </div>
+  </div>
+</div>
+</div>
+
+{%endif%}
+{% endfor %} 
+
+
+
+
+
+</div>
+{% endblock %}
+
+{% block script %}
+<script>
+  var app = new Vue({
+    el: "#free_ticket_div",
+    delimiters: ["[[", "]]"],
+
+    data: {
+      
+      userNumber: "",
+      userNames:"",
+     
+      ticketData:{
+        
+        institution_id:'',
+        
+        quantity:1,
+        eventDevice:''
+        
+        
+      },
+      errorMessage:'',
+      successMessage:'',
+      successfontSize: 30,
+      eventuuid:''
+
+    },
+    methods: {
+
+     
+      clearData: function(){
+        document.getElementById("quantity").value = 1
+        $("#phoneError").addClass("d-none");
+        
+        this.ticketData.eventId = ''
+        this.ticketData.institution_id = '',
+        this.ticketData.eventDevice='',
+        this.eventuuid='',
+        this.userNames='',
+        this.userNumber=''
+        
+      },
+
+
+      setTicketData: function(eventId, institution_id,eventDevice,eventuuid){
+        /* this method is set eventId and institutionId of selected event to generate free ticket for
+        */
+
+       
+        //this.clearData()
+        this.ticketData.eventId = eventId
+        this.ticketData.institution_id = institution_id,
+        this.ticketData.eventDevice=eventDevice,
+        //this.ticketData.category_id=category_id,
+        this.eventuuid=eventuuid
+      },
+
+
+
+      generateFreeTicket: function () { 
+        console.log('here')  
+        //console.log(this.userNumber.substring(0,1))  
+        
+        //console.log(document.getElementById("selectedCategoryId"+this.eventuuid).value)
+        if (this.userNumber.length>0){
+          if(this.userNumber.length==10){
+            if(this.userNumber.substring(0,2)=="07"){
+              
+              if(this.userNames.length>0){
+               if(document.getElementById("selectedCategoryId"+this.eventuuid).value.length>0){ 
+              document.getElementById("generateFreeTicketId").disabled = true;
+              var m = new Date();
+              var todayDate =
+                m.getUTCFullYear() + "-" +
+              ("0" + (m.getUTCMonth()+1)).slice(-2) + "-" +
+              ("0" + m.getUTCDate()).slice(-2) + " " +
+              ("0" + m.getUTCHours()).slice(-2) + ":" +
+              ("0" + m.getUTCMinutes()).slice(-2) + ":" +
+              ("0" + m.getUTCSeconds()).slice(-2);
+
+              var data = {
+                'name':this.userNames,
+                'phone':this.userNumber,
+                'paymentNumber':'N/A',
+                'paymentTime':todayDate,
+                'amount':'1',
+                'reason':'Free',
+                'instId':this.ticketData.institution_id,
+                'deviceId':this.ticketData.eventDevice,
+                'ticketCategoryId':document.getElementById("selectedCategoryId"+this.eventuuid).value,
+                'quantity':document.getElementById("quantity").value
+              }  
+
+              var url = "{% url 'create_ticket' %}"
+          
+                  axios.post(url,data, {
+                    headers: {
+                        'X-CSRFToken': "{{csrf_token | safe}}"
+                    }
+                }).then(res => {
+                  document.getElementById("selectedCategoryId"+this.eventuuid).value=''
+                  this.clearData()
+                  console.log('free ticket created successfully')
+                  this.successMessage="Free ticket(s) generated successfully"
+                  setTimeout(() => this.successMessage = '', 4000);
+                  document.getElementById("generateFreeTicketId").disabled = false;
+                }).catch(err => {
+                  document.getElementById("generateFreeTicketId").disabled = false;
+                    console.error(err);
+                })
+                
+
+              $("#generateFreeTicketModal").modal("hide");
+                
+               }else{
+                this.errorMessage='Please select  free ticket category'
+               }
+
+              }else{
+                this.errorMessage='Provide names for whom you are generating ticket(s)'
+              }
+
+              
+            }else{
+              this.errorMessage='Phone number should start with 07'
+            }
+            
+          }else{
+            this.errorMessage='Phone number should be 10 digits'
+          }
+        }else{
+          this.errorMessage='Please enter phone number to send ticket to'
+        }
+        
+      },
+      checkErrorPhone:function(){
+       
+
+        if (this.userNumber.length>0){
+          if(this.userNumber.length==10){
+            if(this.userNumber.substring(0,2)=="07"){
+              this.errorMessage=''
+            }else{
+              this.errorMessage='Phone number should start with 07'
+            }
+            
+          }else{
+            this.errorMessage='Phone number should be 10 digits'
+          }
+        }else{
+          this.errorMessage='Please enter phone number to send ticket to'
+        }
+      }
+
+
+    },
+    created() {
+    },
+  });
+</script>
+
+{% endblock %}

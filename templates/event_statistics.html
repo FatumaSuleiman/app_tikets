@@ -1,0 +1,135 @@
+{% extends 'base_layout.html' %} {% load static %} {% load humanize %} {% block title %} Events
+{%endblock %} {% block additional_assets %}
+<script src="{% static '/js/vue.js' %}"></script>
+<script src="{% static '/js/axios.min.js' %}"></script>
+{% endblock %} 
+
+{% comment %} {% block instName %} Intore Enterntaiment {% endblock %} {% endcomment %}
+{% block body %}
+
+<div class="row mx-1">
+  <div class="col-md-12">
+    <ul class="breadcrumb">
+      <li><a href="#">Home</a></li>
+      <li><a href="#">Events</a></li>
+      <li>Statistics</li>
+
+    </ul>
+  </div>
+</div>
+<div id="ticket_category">
+  {% for ticket_category in ticket_categories %}
+  {% comment %} this tag is to change ticketUsed to negative value so that add tag does substract {% endcomment %}
+  {% widthratio ticket_category.ticketsUsed 1 -1 as result %}
+  <div class="row mt-2">
+    <div class="col-md-12">
+      <div class="bg-dark text-white text-center p-3 card-styles">
+        <div class="row">
+          <div class="col-md-8 col-sm-8 col-8">
+             <h1>Card1</h1>
+          </div>
+      </div>
+    </div>
+  </div>
+
+  {% endfor %}
+
+  <!-- Modal -->
+
+
+
+
+  <!-- <button @click="openModal ">code Modal</button> -->
+
+  <a href="" id="sendCodeAnchor" class="d-none">anchor holder</a>
+</div>
+
+{% endblock %} {% block script %}
+<script>
+  var app = new Vue({
+    el: "#event_statistics",
+    delimiters: ["[[", "]]"],
+
+    data: {
+      userNumber: ""
+    },
+    methods: {
+
+
+      copyCode: function(){
+        /* Get the text field */
+        var copyText = document.getElementById("codeInput");
+        copyText.select();
+        copyText.setSelectionRange(0, 99999); /* For mobile devices */
+
+        document.getElementById("custom-tooltip").style.display = "inline";
+        document.execCommand("copy");
+        setTimeout( function() {
+            document.getElementById("custom-tooltip").style.display = "none";
+        }, 2000);
+
+        // var result = document.execCommand('copy');
+      },
+
+
+      submit: function () {
+        var amount = $("#amount_value").val();
+        var categoryId = $("#category_id_value").val();
+        var momo = $("#momo_value").val();
+
+        var send_to = document.getElementById("sendTo").value;
+        var anchor = document.getElementById("sendCodeAnchor");
+
+        number = "";
+
+        if (send_to.startsWith("+25")) {
+          number = send_to.substring(3);
+        } else {
+          number = send_to;
+        }
+        var url = `tel:*182*8*2*${momo}*${amount}*${number}${categoryId}#`;
+
+        if (send_to == "") {
+          $("#showError").removeClass("d-none");
+        } else {
+          $("#showError").addClass("d-none");
+
+          anchor.setAttribute("href", url);
+          // anchor.click();
+          send_to = "";
+
+
+          url_to_show = url.substring(4)
+          
+
+          $("#addPhoneModal").modal("hide");
+          $("#codeModal").modal('show')
+          $("#codeInput").val(url_to_show);
+
+          this.userNumber = number
+
+
+
+        }
+      },
+    },
+    created() {
+    },
+  });
+
+  $(document).on("click", ".buy_ticket", function () {
+    var send_to = document.getElementById("sendTo").value;
+    send_to = "";
+
+    amount = $(this).data("amount");
+    categoryid = $(this).data("category");
+    momo = $(this).data("momo");
+
+
+    $("#category_id_value").val(categoryid);
+    $("#momo_value").val(momo);
+    $("#amount_value").val(amount);
+  });
+</script>
+
+{% endblock %}

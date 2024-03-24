@@ -1,0 +1,36 @@
+{% extends 'base_layout.html' %} {% load static %} {% block title %} Events
+{% endblock %} {% block additional_assets %}
+<script src="{% static '/js/vue.js' %}"></script>
+<script src="{% static '/js/axios.min.js' %}"></script>
+
+{% endblock %}
+{% block body %}
+
+<div class="row mx-1">
+  <div class="col-md-12">
+    <ul class="breadcrumb">
+      <li><a href="#">Home</a></li>
+      <li>Events</li>
+    </ul>
+  </div>
+</div>
+
+{% for event in events %}
+<div class="row mt-2">
+  <div class="col-md-12">
+    <a
+      href="{% url 'event_statistics' institution_id=institutionId event_id=event.id %}"
+    >
+      <div class="bg-dark text-white text-center p-3 card-styles">
+        <blockquote class="blockquote mb-0 text-white">
+          <div class="row"><div class="col-md-12 col-sm-12 col-12"><h2 class="text-white text-center">{{event.data.name}}</h2></div></div>
+          <div class="row"><div class="col-md-12 col-sm-12 col-12"><h5 class="text-white text-center">Venue: {{event.data.eventLocation}}</h5></div></div>
+          <footer class="blockquote-footer">
+            <small> {{event.data.date}} at {{event.data.time}} </small>
+          </footer>
+        </blockquote>
+      </div>
+    </a>
+  </div>
+</div>
+{% endfor %} {% endblock %}

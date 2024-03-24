@@ -1,0 +1,489 @@
+{% extends 'base_layout.html' %} {% load static %} {% load humanize %} {% block title %} Events
+{%endblock %} {% block additional_assets %}
+<script src="{% static '/js/vue.js' %}"></script>
+<script src="{% static '/js/axios.min.js' %}"></script>
+<script src="{% static '/js/ticketCategory.js' %}"></script>
+<script src="https://checkout.flutterwave.com/v3.js"></script>
+<link
+rel="stylesheet"
+type="text/css"
+href="{% static 'css/ticketCategory.css' %}"
+/>
+{% endblock %} 
+
+{% comment %} {% block instName %} Intore Enterntaiment {% endblock %} {% endcomment %}
+{% block body %}
+
+<div class="row mx-1">
+  <div class="col-md-12">
+    <ul class="breadcrumb">
+      <li><a href="#">Events</a></li>
+      <li>Categories</li>
+
+    </ul>
+  </div>
+</div>
+<div id="ticket_category">
+  {% for ticket_category in ticket_categories %}
+  {% comment %} this tag is to change ticketUsed to negative value so that add tag does substract {% endcomment %}
+  <div class="row mt-2">
+    <div class="col-md-12">
+      <div class="bg-dark text-white text-center p-3 card-styles">
+        <div class="row">
+          <div class="col-md-8 col-sm-8 col-8">
+            <blockquote class="blockquote mb-0 text-white">
+              <div class="row"><div class="col-md-12 col-sm-12 col-12"><h3 class="text-white text-center">{{ticket_category.data.name}}</h3></div></div>
+              <div class="row"><div class="col-md-12 col-sm-12 col-12"><h4 class="text-white text-center">Price: {{ticket_category.data.amount|intcomma}} RWF</h4></div></div>
+              {% if ticket_category.data.is_group %}
+                  {% if ticket_category.remainingGroupTickets <= 20 %}
+                  <footer class="">
+                    <small class="text-muted text-sm">
+                      {{ticket_category.remainingGroupTickets}} ticket(s) Remains     
+                    </small>
+                  </footer>
+                  {% endif %}
+              {% else %}
+                  {% if ticket_category.remainingIndividualTickets <= 20 %}
+                  <footer class="">
+                    <small class="text-muted text-sm">
+                      {{ticket_category.remainingIndividualTickets}} ticket(s) Remains     
+                    </small>
+                  </footer>
+                  {% endif %}
+              {% endif %}
+            </blockquote>
+          </div>
+          <div class="col-md-4 col-sm-4 col-4 my-auto">
+            {% if ticket_category.data.is_group %}
+                {% if ticket_category.remainingGroupTickets >= 1 %}
+                <button
+                    id=""
+                    class="btn px-4 text-white buy_ticket"
+                    style="background-color: orange"
+                    data-toggle="modal"
+                    @click="setTicketData({{eventMomo}}, '{{ticket_category.data.category_id}}', {{ticket_category.data.amount}}, '{{ticket_category.data.is_group}}', '{{phone_number}}', {{ticket_category.remainingIndividualTickets}})"
+                    data-target="#addPhoneModal"
+                  >
+                  BUY
+                </button> 
+                <!-- <button @click="getParamas({{request.GET.event_id}})">TEST</button> -->
+                {% else %}
+                  <span class="badge badge-pill badge-danger">SOLD OUT</span>
+                {% endif %}
+            {% else %}
+                  {% if ticket_category.remainingIndividualTickets >= 1 %}
+                  <button
+                      id=""
+                      class="btn px-4 text-white buy_ticket"
+                      style="background-color: orange"
+                      data-toggle="modal"
+                      @click="setTicketData({{eventMomo}}, '{{ticket_category.data.category_id}}', {{ticket_category.data.amount}}, '{{ticket_category.data.is_group}}', '{{phone_number}}', {{ticket_category.remainingIndividualTickets}})"
+                      data-target="#addPhoneModal"
+                    >
+                    BUY
+                  </button> 
+                  <!-- <button @click="getParamas({{request.GET.event_id}})">TEST</button> -->
+                  {% else %}
+                    <span class="badge badge-pill badge-danger">SOLD OUT</span>
+                  {% endif %}
+            {% endif %}
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  {% endfor %}
+
+  <!-- <div v-if="this.showLoader=='loading'" class="loader mx-auto"></div> -->
+  <!-- <span v-if="this.showLoader=='loading'" class="ml-4 text-center">loading...</span> -->
+
+  <!-- Modal -->
+  <div
+    class="modal fade bg-dark"
+    id="addPhoneModal"
+    tabindex="-1"
+    role="dialog"
+    aria-labelledby="addPhoneModalLabel"
+    aria-hidden="true"
+  >
+    <!-- add 'modal-dialog-centered' class below to center the modal -->
+    <div class="modal-dialog " role="document">
+      <div class="modal-content">
+        <div class="modal-body">
+        <label v-if="!this.ticketData.is_group" class="mt-1" for="">Quantity</label>
+        <div v-show="!this.ticketData.is_group" class="quantity buttons_added ml-4" class="">
+          <input type="button" value="-" class="minus">
+          <input id="quantity" type="number" step="1" min="1" value="1" :max="[[this.remainingTickects]]" name="quantity" title="Qty" class="input-text qty text" size="4" pattern="" inputmode="" readonly>
+          <input type="button" value="+" class="plus">
+        </div>
+          <h4 class="mb-1 mt-3">Select Payment Option <span class="text-danger">*</span></h4>
+           <input type="radio" id="Mobile Money" name="payment_option" value="momo" v-model="payOption">
+           <label for="Mobile Money">Pay with Mobile Money</label><br>
+           <input type="radio" id="card" name="payment_option" value="card" v-model="payOption">
+           <label for="card">Pay with Card</label><br>
+           <h4 class="my-1" v-if="this.payOption!=''">Add where to send Ticket <span class="text-danger">*</span></h4> 
+          <div class="" id="userPhone">
+            <input
+              v-if="this.payOption=='momo'"
+              id="sendTo"
+              class="form-control"
+              placeholder="Add Phone Number"
+              type="tel"
+              v-model="userNumber"
+              required
+            />
+            <span v-show="this.payOption=='momo'" class="text-red text-sm d-none" id="phoneError"
+              >Please add phone number.</span
+            >
+          </div>
+          <div class="" id="userEmail">
+            <input
+              v-if="this.payOption=='card'"
+              id="userEmail"
+              class="form-control"
+              placeholder="Add Email Address"
+              type="email"
+              v-model="userEmail"
+              required
+            />
+            <span v-show="this.payOption=='card'" class="text-red text-sm d-none" id="emailError"
+              >Please add user email.</span
+            >
+          </div>
+        </div>
+        <span class="text-danger text-center text-sm mb-2" v-show="errorMessage!='' && payOption==''">[[this.errorMessage]]</span>
+        <div class="row pb-2 px-4">
+          <div class="col-md-6 col-sm-6 col-6">
+               <button type="button" class="btn btn-secondary mt--2 w-100" data-dismiss="modal">
+            Close
+          </button>
+          </div>
+          <div class="col-md-6 col-sm-6 col-6">
+            <button
+            @click="makePayment()"
+            type="button"
+            class="btn text-white mt--2 w-100"
+            style="background-color: orange"
+          >
+            BUY TICKET
+          </button>
+          </div>
+       
+          
+        </div>
+      </div>
+    </div>
+  </div>
+    <!-- Modal For code to pay -->
+    <div
+    class="modal fade bg-dark"
+    id="codeModal"
+    tabindex="-1"
+    role="dialog"
+    aria-labelledby="addPhoneModalLabel"
+    aria-hidden="true"
+  >
+    <div class="modal-dialog " role="document">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="addPhoneModalLabel">
+            Use this code below to pay for the ticket
+          </h5>
+          <button
+            type="button"
+            class="close"
+            data-dismiss="modal"
+            aria-label="Close"
+          >
+            <span aria-hidden="true">&times;</span>
+          </button>
+        </div>
+        <div class="modal-body">
+          <div class="row col-md-10 col-sm-12 col-12">
+            <span id="custom-tooltip" class="badge badge-success mb-2" style="display: none;">code copied successfully!</span>
+          </div>
+          <div class="row">
+            <div class="col-md-10 col-sm-12 col-12">
+              <input
+              id="codeInput"
+              class="form-control"
+              placeholder="Phone Number"
+              type="tel"
+              value=""
+              readonly
+            />
+            </div>
+          </div>
+          <div class="row mt-2">
+            <div class="col-md-10 col-sm-12 col-12 mx-auto">
+              <button class="btn btn-lg text-white" @click="dialCode" style="background-color: orange">Dial Code</button>
+              <span class="pr-1">or</span>
+              <button class="btn btn-lg text-white" @click="copyCode" style="background-color: orange">Copy Code </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- <button @click="openModal ">code Modal</button> -->
+
+  <a href="" id="sendCodeAnchor" class="d-none">anchor holder</a>
+</div>
+
+{% endblock %} {% block script %}
+<script>
+  var app = new Vue({
+    el: "#ticket_category",
+    delimiters: ["[[", "]]"],
+
+    data: {
+      showLoader:"",
+      userNumber: "",
+      userEmail:"",
+      payOption:"",
+      remainingTickects:"",
+      ticketData:{
+        amount:1,
+        category_id:'',
+        momo_code:'',
+        quantity:1,
+        is_group:''
+      },
+      errorMessage:''
+
+    },
+    methods: {
+
+      getParamas:function(inst_id){
+         console.log(inst_id)
+      },
+
+      clearData: function(){
+        document.getElementById("quantity").value = 1
+        $("#phoneError").addClass("d-none");
+        $("#emailError").addClass("d-none");
+        this.ticketData = {}
+        this.userEmail = ""
+        this.userNumber = ""
+        this.errorMessage=""
+        this.remainingTickects=""
+      },
+
+
+      setTicketData: function(event_momo, ticket_category, ticket_amount, is_group, phone_number, remainingIndividualTickets){
+        /* this method is used to get the ticket data and pass to its 
+        corresponding vue data */
+
+        console.log(remainingIndividualTickets)
+        
+        this.clearData()
+        this.ticketData.amount = ticket_amount
+        this.ticketData.category_id = ticket_category
+        this.ticketData.momo_code = event_momo
+        this.ticketData.is_group = is_group == 'True' ? true : false
+
+
+        /* this remaining value is being used to set max value possible for adding Tickets
+        quantity */
+        this.remainingTickects = remainingIndividualTickets
+
+
+
+        /*this condition pre fill the phone number input in case there 
+        is a phone number in the url */
+        if(phone_number != 'no_number'){
+          this.userNumber = phone_number
+        }
+      },
+
+      /* this method get url code from temp hidden input field and 
+      dial it to make a phone dial */
+
+      dialCode: function(){
+        var momoPayUrl = document.getElementById("codeInput").value;
+        var url = `tel:${momoPayUrl}`
+        var anchor = document.getElementById("sendCodeAnchor");
+        anchor.setAttribute("href", url);
+        anchor.click();
+      },
+
+      copyCode: function(){
+        /* Get the text field */
+        var momoPayUrl = document.getElementById("codeInput");
+        momoPayUrl.select();
+        momoPayUrl.setSelectionRange(0, 99999); /* For mobile devices */
+
+        document.getElementById("custom-tooltip").style.display = "inline";
+        document.execCommand("copy");
+        setTimeout( function() {
+            document.getElementById("custom-tooltip").style.display = "none";
+        }, 3000);
+
+        // var result = document.execCommand('copy');
+      },
+
+
+      makePayment: function () {       
+        this.ticketData.quantity = document.getElementById("quantity").value
+        var amount = this.ticketData.amount * this.ticketData.quantity
+        var categoryId = this.ticketData.category_id
+        var momo = this.ticketData.momo_code
+        var userPhoneNumber = this.userNumber
+        var anchor = document.getElementById("sendCodeAnchor");
+
+        if (this.payOption==''){
+          this.errorMessage='Select payment option first'
+        }else{
+          this.errorMessage=''
+
+
+        number = "";
+        if (userPhoneNumber.startsWith("+25")) {
+          number = userPhoneNumber.substring(3);
+        } else {
+          number = userPhoneNumber;
+        }
+        var url = `tel:*182*8*2*${momo}*${amount}*${number}${categoryId}#`;
+
+        // if the payment is momo
+        if (this.payOption == 'momo'){
+          if (userPhoneNumber == "") {
+            $("#phoneError").removeClass("d-none");
+          } else {
+              $("#phoneError").addClass("d-none");
+              anchor.setAttribute("href", url);
+              // anchor.click();
+              userPhoneNumber = "";
+              url_to_show = url.substring(4)
+              $("#addPhoneModal").modal("hide");
+              $("#codeModal").modal('show')
+              $("#codeInput").val(url_to_show);
+              this.userNumber = number  
+          }
+        }else{
+          // if payment option is card.
+          if (this.userEmail == "") {
+            $("#emailError").removeClass("d-none");
+          } else {
+              $("#emailError").addClass("d-none");
+              $("#addPhoneModal").modal("hide");
+              console.log('GOOD TO CONTINUE TO CARD')
+              // this.showLoader='loading' 
+              // this.saveCardTransactions()
+              this.flutterwavePayment()
+          }
+        }
+      }
+      },
+
+      // this method is for saving the card transaction
+      saveCardTransactions:function(){
+                var event_id = '{{event_id}}'
+                var institution_id = '{{institution_id}}'
+                url =
+                `/nokandaService/institutions/${institution_id}/events/${event_id}/saveCardtrans`,
+                data = {
+                    "amount": this.ticketData.amount,
+                    "payerEmail":this.userEmail,
+                    "ticketCategory":this.ticketData.category_id,
+                    "ticketQuantity":parseInt(this.ticketData.quantity)
+                }
+                axios.post(url,data, {
+                    headers: {
+                        'X-CSRFToken': "{{csrf_token | safe}}"
+                    }
+                }).then(res => {
+                  //  var event_id = '{{csrf_token | safe}}'
+                    console.log(res)
+                    
+                    this.flutterwavePayment(res.data)
+                  // proceed with payment
+                }).catch(err => {
+                    console.error(err);
+                })
+            },
+
+
+      // this method is for card payment by flutterwave on call back function send
+      // data to generate a ticket
+      flutterwavePayment:function() {
+
+
+        var payerNumber = Math.round( Math.random()*1000000000 )
+        var categoryId = this.ticketData.category_id
+        var quantity = parseInt(this.ticketData.quantity)
+        var reason = this.userEmail
+
+
+        // get current date string as the Momo date format
+        var m = new Date();
+        var todayDate =
+          m.getUTCFullYear() + "-" +
+        ("0" + (m.getUTCMonth()+1)).slice(-2) + "-" +
+        ("0" + m.getUTCDate()).slice(-2) + " " +
+        ("0" + m.getUTCHours()).slice(-2) + ":" +
+        ("0" + m.getUTCMinutes()).slice(-2) + ":" +
+        ("0" + m.getUTCSeconds()).slice(-2);
+
+
+
+        FlutterwaveCheckout({
+          public_key: 'FLWPUBK_TEST-783b7271418cb678ae366af408ad8551-X',
+          tx_ref: payerNumber,
+          amount: this.ticketData.amount * parseInt(this.ticketData.quantity),
+          currency: "RWF",
+          payment_options: "card",
+          // redirect_url: "http://127.0.0.1:8000/nokandaService/success",
+          customer: {
+            email: this.userEmail,
+            // phone_number: "0781715054",
+            // name: "Tusifu Edison",
+          },
+          customizations: {
+            title: "Nokanda Tickets",
+            description: "This is for Nokanda Ticket",
+            logo: "https://is3-ssl.mzstatic.com/image/thumb/Purple122/v4/93/3f/ac/933fac00-7701-3777-a478-9aa5d8c87005/source/512x512bb.jpg",
+          },
+          callback: function(callbackData) {
+                var event_id = '{{event_id}}'
+                var institution_id = '{{institution_id}}'
+                var eventDevice = '{{eventDevice}}'
+
+                var data = {
+                  'name':'N/A',
+                  'phone':'N/A',
+                  'paymentNumber':payerNumber,
+                  'paymentTime':todayDate,
+                  'amount':callbackData.amount,
+                  'reason':reason,
+                  'instId':institution_id,
+                  'deviceId':eventDevice,
+                  'ticketCategoryId':categoryId,
+                  'quantity':quantity
+                }  
+                var url = "{% url 'create_ticket' %}"
+                if(callbackData.status == 'successful'){
+                  axios.post(url,data, {
+                    headers: {
+                        'X-CSRFToken': "{{csrf_token | safe}}"
+                    }
+                }).then(res => {
+                  console.log('ticket created successfully')
+                }).catch(err => {
+                    console.error(err);
+                })
+                }else{
+                  // implement payment failed
+                }
+            },
+        });
+      },
+    },
+    created() {
+    },
+  });
+</script>
+
+{% endblock %}

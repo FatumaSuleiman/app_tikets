@@ -1,0 +1,74 @@
+
+html, body {
+    max-width: 100%;
+    overflow-x: hidden;
+}
+  
+  #header-row{
+      background-color: orange;
+      height: 100px;
+  }
+ .card-styles:hover{
+  cursor: pointer;
+ }
+ .card-styles{
+  border-radius: 10px;
+  margin-left: 10px;
+  margin-right: 10px;
+ }
+ .modal-dialog{
+   max-width:100%;
+ }
+
+ #sendTo:focus{
+  outline: none !important;
+    border:0.3px solid orange;
+    /* box-shadow: 0 0 6px orange; */
+ }
+
+
+/* Style the list */
+ul.breadcrumb {
+  padding: 10px 16px;
+  list-style: none;
+  background-color: #eee;
+}
+
+/* Display list items side by side */
+ul.breadcrumb li {
+  display: inline;
+  font-size: 18px;
+}
+
+/* Add a slash symbol (/) before/behind each list item */
+ul.breadcrumb li+li:before {
+  padding: 8px;
+  color: black;
+  content: "/\00a0";
+}
+
+/* Add a color to all links inside the list */
+ul.breadcrumb li a {
+  color: #0275d8;
+  text-decoration: none;
+}
+
+/* Add a color on mouse-over */
+ul.breadcrumb li a:hover {
+  color: #01447e;
+  text-decoration: underline;
+}
+i {
+  color: #9ABC66;
+  font-size: 100px;
+  line-height: 200px;
+  margin-left:-15px;
+}
+.card-success {
+  background: white;
+  padding: 60px;
+  border-radius: 4px;
+  box-shadow: 0 2px 3px #C8D0D8;
+  display: inline-block;
+  margin: 0 auto;
+}
