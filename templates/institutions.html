@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    {% load static %}
+    {% load humanize %}
+    {% block title %}
+        <title>Institutions</title>
+    {% endblock %}
+
+    {% block additional_assets %}
+    <script src="{% static 'js/vue.js' %}"></script>
+    <script src="{% static 'js/axios.min.js' %}"></script>
+    {% endblock %}
+
+    <link rel="stylesheet" href="{% static 'css/style.css' %}">
+    <link rel="stylesheet" type="text/css" href="{% static 'css/argon.min.css' %}"/>
+
+    <script src="{% static 'vendor/jquery/jquery.min.js' %}"></script>
+    <script src="{% static 'vendor/bootstrap/js/bootstrap.bundle.min.js' %}"></script>
+    <script src="{% static 'vendor/bootstrap/js/bootstrap.min.js' %}"></script>
+</head>
+<body style="background-color:#eee">
+    <div class="row mx-1">
+        <div class="col-md-12">
+            <ul class="breadcrumb">
+                <li><a href="/institutions/home">Home</a></li>
+                <li><a href="{% url 'login' %}">Go to Login</a> </li>
+            </ul>
+        </div>
+    </div>
+    <div id="app">
+        <div  v-if="showForm" class="card ml-5" style="width:50em;">
+            <div class="card-body">
+                <h3>Institution</h3>
+                <form  @submit.prevent="createInstitution">
+                    <div class="row mb-3">
+                        <div class="col">
+                            <input type="text" class="form-control" placeholder="Name" v-model="newInstitution.name">
+                        </div>
+                        <div class="col">
+                            <input type="text" class="form-control" placeholder="Identifier" v-model="newInstitution.identifier">
+                        </div>
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col">
+                            <input type="text" class="form-control" placeholder="Phone" v-model="newInstitution.phone">
+                        </div>
+                        <div class="col">
+                            <input type="text" class="form-control" placeholder="Callback URL" v-model="newInstitution.call_back_url">
+                        </div>
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col">
+                            <input type="text" class="form-control" placeholder="URL Method" v-model="newInstitution.url_method">
+                        </div>
+                        <div class="col">
+                            <input type="text" class="form-control" placeholder="URL Query Parameter" v-model="newInstitution.url_query_parameter">
+                        </div>
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col">
+                            <input type="text" class="form-control" placeholder="Active" v-model="newInstitution.active">
+                        </div>
+                        <div class="col">
+                            <input type="text" class="form-control" placeholder="Users" v-model="newInstitution.users">
+                        </div>
+                    </div>
+                    <div class="row mt-3">
+                        <div class="col-md-6">
+                            <span class="text-danger" v-if="errorMessage">[[errorMessage]]</span>
+                            <span class="text-success" v-if="successMessage">[[this.successMessage]]</span>
+                        <button type="submit" class="btn btn-warning form-control" style="border-radius:20px">Create</button>
+                        </div>
+                        <div class="col-md-6">
+                        <button type="button" class="btn btn-secondary ml-2 form-control"  style="border-radius:20px" @click="handleCancelButton">Cancel</button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <div v-show="showTable" class="card ml-5" style="width:90rem;">
+            <div class="card-body">
+                <div class="float-right mb-2">
+                    <button class="btn bg-blue  text-white"  style="border-radius:20px" @click="handleAddButtonClick">Add Institution</button>
+                </div>
+                <h3>Institutions List</h3>
+                <table class="table table-striped table-hover">
+                    <thead>
+                        <tr>
+                            <th class="text-white bg-dark">No</th>
+                            <th class="text-white bg-dark">Name</th>
+                            <th class="text-white bg-dark">Identifier</th>
+                            <th class="text-white bg-dark">Phone</th>
+                            <th class="text-white bg-dark">Active</th>
+                            <th class="text-white bg-dark">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for i in institutions %}
+                        <tr>
+                            <td>{{ forloop.counter }}</td>
+                            <td>{{ i.name }}</td>
+                            <td>{{ i.identifier }}</td>
+                            <td>{{ i.phone }}</td>
+                            <td>{{ i.active|yesno:"Yes,No" }}</td>
+                            <td>
+                                <div style="display:flex; justify-content:space-between;">
+                                    <a style="margin-right: 20px;" href="/institutions/institutionDetails/{{i.inst_id}}">Details</a>
+                                    <a href="/institutions/update_institutions/{{i.inst_id}}">Update</a>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        Vue.filter('yesno', function (value) {
+            return value ? 'Yes' : 'No';
+        });
+    new Vue({
+        el: '#app',
+        delimiters: ['[[', ']]'],
+        data: {
+            showForm: false,
+            showTable: true,
+            newInstitution: {
+                name: '',
+                identifier: '',
+                phone: '',
+                call_back_url: '',
+                url_method: '',
+                url_query_parameter: '',
+                active: '',
+                users: ''
+            },
+            existingIdentifiers: [],
+            successMessage:'',
+            errorMessage:''
+        },
+        methods: {
+            viewForm() {
+                this.showForm = true;
+                this.showTable = false;
+            },
+            viewTable(){
+                this.showTable = true;
+                this.showForm = false;
+            },
+            handleAddButtonClick(){
+                this.viewForm();
+            },
+            handleCancelButton(){
+                this.viewTable();
+            },
+            createInstitution() {
+                if (!this.newInstitution.name || !this.newInstitution.identifier) {
+                    this.errorMessage = 'Name and identifier are required.';
+                    console.log(this.errorMessage);
+                    setTimeout(this.clearMessages,3000);
+                    return;
+                }
+                if (this.existingIdentifiers.includes(this.newInstitution.identifier)) {
+                    this.errorMessage = 'Identifier must be unique.';
+                    console.log(this.errorMessage);
+                    setTimeout(this.clearMessages,3000);
+                    return;
+                }
+
+                var token = localStorage.getItem('token');
+
+                // Send POST request to create institution
+                axios.post('/institutions/createInstitutions', this.newInstitution, {
+                    headers: {
+                        'X-CSRFToken': "{{csrf_token | safe}}",
+                        'Authorization': token
+                    }
+                })
+                .then(response => {
+                     this.successMessage = 'Institution created successfully';
+                    this.existingIdentifiers.push(this.newInstitution.identifier);
+                    setTimeout(this.clearMessages,3000);
+
+                    // Reset form fields
+                    this.newInstitution = {
+                        name: '',
+                        identifier: '',
+                        phone: '',
+                        call_back_url: '',
+                        url_method: '',
+                        url_query_parameter: '',
+                        active: '',
+                        users: ''
+                    };
+
+                })
+                .catch(error => {
+                    this.errorMessage = `Error creating Institution: ${error}`;
+                    console.log(this.errorMessage);
+                    setTimeout(this.clearMessages,3000);
+                });
+            },
+            clearMessages() {
+                this.successMessage = '';
+                this.errorMessage = '';
+        }
+        }
+    });
+    </script>
+</body>
+</html>

@@ -1,0 +1,160 @@
+{% extends 'base_layout.html' %}
+{% load static %}
+
+{% block title %}
+ Update TicketCategory
+{% endblock %}
+
+{% block additional_assets %}
+<script src="{% static 'js/vue.js' %}"></script>
+<script src="{% static 'js/axios.min.js' %}"></script>
+<link rel="stylesheet" href="{% static 'css/style.css' %}">
+<link rel="stylesheet" type="text/css" href="{% static 'css/argon.min.css' %}"/>
+<script src="{% static 'vendor/jquery/jquery.min.js' %}"></script>
+<script src="{% static 'vendor/bootstrap/js/bootstrap.bundle.min.js' %}"></script>
+<script src="{% static 'vendor/bootstrap/js/bootstrap.min.js' %}"></script>
+{% endblock %}
+
+{% block body %}
+<div class="row mx-1">
+    <div class="col-md-12">
+        <ul class="breadcrumb">
+            <li><a href="/institutions/get_institutions">Institutions</a></li>
+        </ul>
+    </div>
+</div>
+
+<div id="app" data-institution-id="{{institution_id}}" data-event-id="{{event_id}}" data-ticketCategory-id="{{categ_id}}">
+    <div class="card ml-5" style="width:60em;">
+        <div class="card-body">
+            <h3>TicketCategory</h3>
+            <form @submit.prevent="updateTicketCategory">
+                <div class="row mb-3">
+                    <div class="col">
+                        <label>Name:</label>
+                        <input type="text" class="form-control" placeholder="Name" v-model="ticket_category.name">
+                    </div>
+                    <div class="col">
+                        <label>CategoryId:</label>
+                        <input type="text" class="form-control" placeholder="CategoryId" v-model="ticket_category.category_id">
+                    </div>
+                </div>
+                <div class="row mb-3">
+                    <div class="col">
+                        <label>Amount:</label>
+                        <input type="text" class="form-control" placeholder="Amount" v-model="ticket_category.amount">
+                    </div>
+                    <div class="col">
+                        <label>Group Quantity:</label>
+                        <input type="text" class="form-control" placeholder="Group Quantity" v-model="ticket_category.group_quantity">
+                    </div>
+                </div>
+                <div class="row mb-3">
+                    <div class="col">
+                        <label>Quantity:</label>
+                        <input type="text" class="form-control" placeholder="Quantity" v-model="ticket_category.quantity">
+                    </div>
+                    <div class="col">
+                        <label>IsFree:</label>
+                        <div>
+                            <input type="radio" id="is_free-true" value="True" v-model="ticket_category.is_free">
+                            <label for="is_free-true">True</label>
+                        </div>
+                        <div>
+                            <input type="radio" id="is_free-false" value="False" v-model="ticket_category.is_free">
+                            <label for="is_free-false">False</label>
+                        </div>
+                    </div>
+                </div>
+                <div class="row ">
+                    <div class="col">
+                        <label>IsGroup:</label>
+                        <div>
+                            <input type="radio" id="is_group-true" value="True" v-model="ticket_category.is_group">
+                            <label for="is_group-true">True</label>
+                        </div>
+                        <div>
+                            <input type="radio" id="is_group-false" value="False" v-model="ticket_category.is_group">
+                            <label for="is_group-false">False</label>
+                        </div>
+                    </div>
+                </div>
+                <div class="row mt-3">
+                    <span class="text-danger" v-if="errorMessage">[[ errorMessage ]]</span>
+                    <span class="text-success" v-if="successMessage">[[ successMessage ]]</span>
+                    <button type="submit" class="btn btn-warning form-control" style="border-radius:10px">Update</button>
+                    <button type="button" class="btn btn-secondary form-control" style="border-radius:10px" @click="cancelUpdate">Cancel</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block script %}
+<script>
+    new Vue({
+        el: '#app',
+        delimiters: ['[[', ']]'],
+        data: {
+            ticket_category: {
+                name: '',
+                category_id: '',
+                amount: '',
+                quantity: '',
+                group_quantity: '',
+                is_free: '',
+                is_group: '',
+            },
+            errorMessage:'',
+            successMessage:''
+        },
+        methods: {
+            updateTicketCategory() {
+                var token = localStorage.getItem('token');
+                var inst_id =this.$el.getAttribute('data-institution-id');
+                var event_id =this.$el.getAttribute('data-event-id');
+                var categ_id = this.$el.getAttribute('data-ticketCategory-id');
+                var categoryId = '{{data.category_id}}';
+                if(this.ticket_category.category_id !=categoryId){
+                    this.errorMessage='categpry_id should be unique.';
+                    setTimeout(this.clearMessages,3000);
+                    return;
+                }
+                if (inst_id && event_id && categ_id) {
+                    const url = `/categories/updateTicketCategory/${inst_id}/${event_id}/${categ_id}`;
+                    
+                    axios.put(url, this.ticket_category, {
+                        headers: {
+                            'X-CSRFToken': "{{ csrf_token }}",
+                            'Authorization': token
+                        }
+                    })
+                    .then(response => {
+                        this.successMessage = 'Ticket category updated successfully';
+                        setTimeout(this.clearMessages,3000);
+                    })
+                    .catch(error => {
+                        this.errorMessage =`Error updating ticket category:${ error}`;
+                        setTimeout(this.clearMessages,3000);
+                    });
+                } else {
+                    this.errorMessage = 'Missing inst_id, event_id, or categ_id';
+                    setTimeout(this.clearMessages,3000);
+                }
+            },
+            cancelUpdate() {
+                this.institutionId = this.$el.getAttribute('data-institution-id');
+                // Navigate to the target URL when Cancel is clicked
+                var inst_id =this.$el.getAttribute('data-institution-id');
+                var event_id =this.$el.getAttribute('data-event-id');
+                window.location.href = `/institutions/${inst_id}/events/${event_id}`; 
+            },
+            clearMessages() {
+                this.successMessage = '';
+                this.errorMessage = '';
+        }
+        }
+    });
+</script>
+{% endblock %}

@@ -282,12 +282,6 @@ aria-hidden="true"
               }  
 
               var url = "{% url 'create_ticket' %}"
-          
-                  axios.post(url,data, {
-                    headers: {
-                        'X-CSRFToken': "{{csrf_token | safe}}"
-                    }
-                }).then(res => {
                   document.getElementById("selectedCategoryId"+this.eventuuid).value=''
                   this.clearData()
                   console.log('free ticket created successfully')

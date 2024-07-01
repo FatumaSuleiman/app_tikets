@@ -1,0 +1,214 @@
+{% extends 'base_layout.html' %}
+{% load static %}
+
+{% block title %}
+ Update Event
+{% endblock %}
+
+{% block additional_assets %}
+<script src="{% static '/js/vue.js' %}"></script>
+<script src="{% static '/js/axios.min.js' %}"></script>
+<link rel="stylesheet" href="{% static 'css/style.css' %}">
+<link rel="stylesheet" type="text/css" href="{% static 'css/argon.min.css' %}"/>
+<script src="{% static 'vendor/jquery/jquery.min.js' %}"></script>
+<script src="{% static 'vendor/bootstrap/js/bootstrap.bundle.min.js' %}"></script>
+<script src="{% static 'vendor/bootstrap/js/bootstrap.min.js' %}"></script>
+{% endblock %}
+
+{% block body %}
+<div class="row mx-1">
+    <div class="col-md-12">
+        <ul class="breadcrumb">
+            <li><a href="/institutions/get_institutions">Institution</a></li>
+            <li><a href="/institutions/{{ inst_id }}/events/">Event</a></li>
+        </ul>
+    </div>
+</div>
+
+<div id="app" class="wrapper" style="background-color: #eee; padding: 20px; border-radius: 10px;"data-institution-id="{{inst_id}}">
+    <div class="card ml-5" style="width:50em;">
+        <div class="card-body">
+            <h3>Event</h3>
+            <form @submit.prevent="updateEvent">
+                <div class="row mb-3">
+                    <div class="col">
+                        <label>Name:</label>
+                        <input type="text" class="form-control"  v-model="event.name">
+                    </div>
+                    <div class="col">
+                        <label>EventID:</label>
+                        <input type="text" class="form-control"  v-model="event.eventID">
+                    </div>
+                </div>
+                <div class="row mb-3">  
+                <div class="col"> 
+                    <label>EventDevice:</label>               
+                <input type="text" class="form-control"  v-model="event.eventDevice">
+                    </div>
+                    <div class="col">
+                        <label>Callback Url:</label>
+                        <input type="text" class="form-control" v-model="event.call_back_url">
+                    </div>
+                </div>
+                <div class="row mb-3">
+                    <div class="col">
+                        <label>Description:</label>
+                        <input type="text" class="form-control"  v-model="event.description">
+                    </div>
+                    <div class="col">
+                        <label>Event Location:</label>
+                        <input type="text" class="form-control"  v-model="event.eventLocation">
+                    </div>
+                </div>
+                <div class="row mb-3">
+                    <div class="col">
+                        <label>Unfiniched Group Remaining Members:</label>
+                        <input type="text" class="form-control"  v-model="event.unfinished_group_remaining_members">
+                    </div>
+                    <div class="col">
+                        <label>Date:</label>
+                        <input type="text" class="form-control"  v-model="event.date">
+                    </div>
+                </div>
+                <div class="row mb-3">
+                    <div class="col">
+                        <label>Time:</label>
+                        <input type="text" class="form-control"  v-model="event.time">
+                    </div>
+                    <div class="col">
+                        <label>MomoCode:</label>
+                        <input type="text" class="form-control"  v-model="event.momoCode">
+                    </div>
+                </div>
+                <div class="row mb-3">
+                    <div class="col">
+                        <label>Simple Purchase Amount:</label>
+                        <input type="text" class="form-control"  v-model="event.singlePurchaseAmount">
+                    </div>
+                    <div class="col">
+                        <label> How Many Per Group:</label>
+                        <input type="text" class="form-control"  v-model="event.how_many_per_group">
+                    </div>
+                </div>
+                <div class="row mb-3">
+                    <div class="col">
+                        <label>Current Group Number:</label>
+                        <input type="text" class="form-control"  v-model="event.current_group_number">
+                    </div>
+                    <div class="col">
+                        <label>Unfiniched Group:</label>
+                        <input type="text" class="form-control"  v-model="event.unfinished_group">
+                    </div>
+                </div>
+                <div class="row mb-3">
+                      <div class="col">
+                        <label>Active:</label>
+                        <div>
+                            <input type="radio" id="active-true" value="True" v-model="event.active">
+                            <label for="active-true">True</label>
+                        </div>
+                        <div>
+                            <input type="radio" id="active-false" value="False" v-model="event.active">
+                            <label for="active-false">False</label>
+                        </div>
+                    </div>
+                       <div class="col">
+                        <label>Group Number Assignation Required:</label>
+                        <div>
+                            <input type="radio" id="group_number_assignation_required-true" value="True" v-model="event.group_number_assignation_required">
+                            <label for="active-true">True</label>
+                        </div>
+                        <div>
+                            <input type="radio" id="group_number_assignation_required-false" value="False" v-model="event.group_number_assignation_required">
+                            <label for="active-false">False</label>
+                        </div>
+                    </div>
+                </div>
+                <div class="row mt-3">
+                    <span class="text-danger" v-if="errorMessage">[[ errorMessage ]]</span>
+                    <span class="text-success" v-if="successMessage">[[ successMessage ]]</span>
+                    <button type="submit" class="btn btn-warning form-control mb-3" style="border-radius:10px">Update</button>
+                    <button type="button" class="btn btn-btn-secondary form-control" style="border-radius:10px" @click="cancelUpdate">Cancel</button>
+
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block script %}
+<script>
+    new Vue({
+        el: '#app',
+        delimiters: ['[[', ']]'],
+        data: {
+            event: {
+                name: '',
+                eventID: '',
+                eventDevice: '',
+                call_back_url: '',
+                description: '',
+                eventLocation: '',
+                active: '',
+                date: '',
+                active: '',
+                momoCode: '',
+                singlePurchaseAmount: '',
+                how_many_per_group: '',
+                current_group_number: '',
+                unfinished_group: '',
+                unfinished_group_remaining_members: '',
+                group_number_assignation_required: '',
+            },
+            errorMessage:'',
+            successMessage:'',
+            institutionId:''
+        },
+        methods: {
+            updateEvent() {
+                var token = localStorage.getItem('token');
+                var inst_id = '{{ inst_id }}';
+                var event_id = '{{ event_id }}';
+                if (this.event.eventID !='{{data.eventID}}'){
+                    this.errorMessage = ' eventID should be  unique.';
+                    setTimeout(this.clearMessages,3000);
+                    return;
+                }
+                
+                if (inst_id && event_id) {
+                    const url = `/events/updateEvents/${inst_id}/${event_id}`;
+                    
+                    axios.put(url, this.event, {
+                        headers: {
+                            'X-CSRFToken': "{{ csrf_token }}",
+                            'Authorization': token
+                        }
+                    })
+                    .then(response => {
+                        this.successMessage = 'Event updated successfully';
+                        console.log(this.successMessage)
+                        setTimeout(this.clearMessages,3000);
+                        
+                    })
+                    .catch(error => {
+                        this.errorMessage =`Error updating event:${error}`;
+                        console.log(this.errorMessage)
+                        setTimeout(this.clearMessages,3000);
+                       
+                    });
+                }
+            },
+            cancelUpdate() {
+                this.institutionId = this.$el.getAttribute('data-institution-id');
+                // Navigate to the target URL when Cancel is clicked
+                window.location.href = `/institutions/institutionDetails/${this.institutionId}`; 
+            },
+            clearMessages() {
+                this.successMessage = '';
+                this.errorMessage = '';
+        }
+        }
+    });
+</script>
+{% endblock %}

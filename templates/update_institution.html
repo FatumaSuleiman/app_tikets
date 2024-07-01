@@ -1,0 +1,154 @@
+{% extends 'base_layout.html' %}
+{% load static %}
+
+{% block title %}
+Update Institution
+{% endblock %}
+
+{% block additional_assets %}
+<script src="{% static 'js/vue.js' %}"></script>
+<script src="{% static 'js/axios.min.js' %}"></script>
+<link rel="stylesheet" href="{% static 'css/style.css' %}">
+<link rel="stylesheet" type="text/css" href="{% static 'css/argon.min.css' %}"/>
+<script src="{% static 'vendor/jquery/jquery.min.js' %}"></script>
+<script src="{% static 'vendor/bootstrap/js/bootstrap.bundle.min.js' %}"></script>
+<script src="{% static 'vendor/bootstrap/js/bootstrap.min.js' %}"></script>
+{% endblock %}
+
+{% block body %}
+<div class="row mx-1">
+    <div class="col-md-12">
+        <ul class="breadcrumb">
+            <li><a href="/institutions/get_institutions">Institution</a></li>
+        </ul>
+    </div>
+</div>
+
+<div id="app" class="wrapper">
+    <div class="card ml-5" style="width:50em;">
+        <div class="card-body">
+            <h3>Institution</h3>
+            <form @submit.prevent="updateInstitution">
+                <div class="row mb-3">
+                    <div class="col">
+                        <label>Name:</label>
+                        <input type="text" class="form-control" v-model="institution.name">
+                    </div>
+                    <div class="col">
+                        <label>Identifier:</label>
+                        <input type="text" class="form-control" v-model="institution.identifier">
+                    </div>
+                </div>
+                <div class="row mb-3">
+                    <div class="col">
+                        <label>Phone:</label>
+                        <input type="text" class="form-control" v-model="institution.phone">
+                    </div>
+                    <div class="col">
+                        <label>Callback Url:</label>
+                        <input type="text" class="form-control" v-model="institution.call_back_url">
+                    </div>
+                </div>
+                <div class="row mb-3">
+                    <div class="col">
+                        <label>Url Method:</label>
+                        <input type="text" class="form-control" v-model="institution.url_method">
+                    </div>
+                    <div class="col">
+                        <label>Url Query Parameter:</label>
+                        <input type="text" class="form-control" v-model="institution.url_query_parameter">
+                    </div>
+                </div>
+                <div class="row mb-3">
+                    <div class="col">
+                        <label>Active:</label>
+                        <div>
+                            <input type="radio" id="active-true" value="True" v-model="institution.active">
+                            <label for="active-true">True</label>
+                        </div>
+                        <div>
+                            <input type="radio" id="active-false" value="False" v-model="institution.active">
+                            <label for="active-false">False</label>
+                        </div>
+                    </div>
+                    <div class="col">
+                        <label>Users:</label>
+                        <input type="text" class="form-control" v-model="institution.users">
+                    </div>
+                </div>
+                <div class="row mt-5">
+                    <span class="text-danger" v-if="errorMessage">[[ errorMessage ]]</span>
+                    <span class="text-success" v-if="successMessage">[[ successMessage ]]</span>
+                    <button type="submit" class="btn btn-warning form-control" style="border-radius:10px">Update</button>
+                    <button type="button" class="btn btn-secondary form-control" style="border-radius:10px" @click="cancelUpdate">Cancel</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block script %}
+<script>
+    new Vue({
+        el: '#app',
+        delimiters: ['[[', ']]'],
+        data: {
+            institution: {
+                name: '',
+                identifier: '',
+                phone: '',
+                call_back_url: '',
+                url_method: '',
+                url_query_parameter: '',
+                active: '',
+                users: ''
+            },
+            successMessage: '',
+            errorMessage: ''
+        },
+        methods: {
+            updateInstitution() {
+                var token = localStorage.getItem('token');
+                var inst_id = '{{ inst_id }}';
+                var identifier = '{{data.identifier}}'
+                if (this.institution.identifier != identifier){
+                    this.errorMessage = 'Identifier  should be unique.';
+                    this.successMessage = '';
+                    setTimeout(this.clearMessages, 3000);
+                    return;
+                }
+                if (inst_id) {
+                    const url = `/institutions/updateInstitutions/${inst_id}`;
+                    
+                    axios.put(url, this.institution, {
+                        headers: {
+                            'X-CSRFToken': "{{ csrf_token }}",
+                            'Authorization': token
+                        }
+                    })
+                    .then(response => {
+                        this.successMessage = 'Institution updated successfully';
+                        this.errorMessage = '';
+                        console.log(this.successMessage);
+                        setTimeout(this.clearMessages, 3000);
+                    })
+                    .catch(error => {
+                        this.errorMessage = `Error updating institution: ${error}`;
+                        this.successMessage = '';
+                        console.log(this.errorMessage);
+                        setTimeout(this.clearMessages, 3000);
+                    });
+                }
+            },
+            cancelUpdate() {
+                window.location.href = '/institutions/get_institutions';
+            },
+            clearMessages() {
+                this.successMessage = '';
+                this.errorMessage = '';
+            }
+        }
+    });
+</script>
+{% endblock %}

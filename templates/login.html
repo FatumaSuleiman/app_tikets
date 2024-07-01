@@ -1,0 +1,106 @@
+
+{% extends 'base_layout.html' %}{% load static %} {% block title %} Login
+{% endblock %} {% block additional_assets %}
+<script src="{% static '/js/vue.js' %}"></script>
+<script src="{% static '/js/axios.min.js' %}"></script>
+
+{% endblock %}
+{% block body %}
+
+
+<div id="app" class="container">
+   <div class="card ml-6" style="width:50em;">
+      <div class="card-body ">
+         <h3 class=" text-center mb-2">Sign In</h3>
+         <p class="text-center">Login to stay connected.</p>
+         <form @submit.prevent="login">
+            <div class="row">
+               <div class="col-md-12">
+                  <div class="form-group">
+                     <label>Email:</label>
+                     <input  id="email"class=" form-control" type="email" placeholder="Enter Email ">
+                  </div>
+               </div>
+               <div class="col-md-12">
+                  <div class="form-group">
+                     <label>Password:</label>
+                     <input id="password" class=" form-control" type="password" placeholder="Password ">
+                  </div>
+               </div>
+               
+            </div>
+            <span class="text-danger" v-if="errorMessage">[[ errorMessage ]]</span>
+            <span class="text-success" v-if="successMessage">[[ successMessage ]]</span>
+            <button type="submit" class="btn btn-warning form-control" style="border-radius:10px" @click="login">Sign In</button>
+          
+         </form>
+      </div>
+   </div>
+      </div>
+   </div>
+ {% endblock %}
+ {% block script%}
+
+ <script>
+   new Vue({
+      el: '#app',
+      delimiters: ['[[', ']]'],
+        data: {
+         
+         signIn: {
+            email:'',
+            password:''
+        },
+      errorMessage:'',
+      successMessage:''
+
+        },
+         
+      
+      methods: {
+          
+          login() {
+              document.querySelector('.btn').disabled = true;
+              
+              const url = '/token'; 
+              var email=document.querySelector('#email').value;
+              var password=document.querySelector('#password').value;
+              console.log(email,password);
+          
+              axios.post(url,{email:email,
+               password:password} , {
+                 
+                  headers: {
+                      'X-CSRFToken': "{{csrf_token | safe}}"
+                  }
+              })
+              .then(response => {
+               localStorage.setItem('token',response.data.access_token);
+                  console.log(response.data.access_token);
+                  this.successMessage = 'Login is successfully.';
+                 
+                  Object.assign(this.signIn, {
+                     email:'',
+                     password:''
+                  });
+                  
+                  document.querySelector('.btn').disabled = false;
+                  window.location.href = '/institutions/get_institutions';
+              })
+              .catch(error => {
+                  this.errorMessage = `Error in logging in:  ${error}`;
+                  setTimeout(this.clearMessages,4000);
+                  
+                  document.querySelector('.btn').disabled = false;
+              });
+          },
+          clearMessages() {
+            this.successMessage = '';
+            this.errorMessage = '';
+    }
+       
+      }
+  });
+ </script>
+ {% endblock %}
+

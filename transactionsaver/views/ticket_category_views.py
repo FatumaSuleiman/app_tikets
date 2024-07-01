@@ -7,8 +7,8 @@ from transactionsaver import serializers
 from rest_framework.generics import GenericAPIView
 from .transaction_views import get_ticket_number,get_phone_fromReason
 from transactionsaver.views.users_views import FirebaseAuthentication
-from .transaction_views import createInstitutionEventTransaction,createInstitutionEventTickets,is_email,send_message,send_ticket_in_email,createInstitutionTickets
-
+from .transaction_views import createInstitutionEventTransaction,createInstitutionEventTickets,is_email,send_message,send_ticket_in_email,createInstitutionTickets,SendSMSAndSaveData_V2
+from django.http import JsonResponse
 class SendSMSAndSaveData1(threading.Thread):
     def __init__(self,tickets, transObj, tr_type):
         self.tickets = tickets
@@ -34,12 +34,12 @@ def send_to_firebase_and_messages(tickets,trans_obj,tr_type):
     """
 
     institution_id = trans_obj['instId']
-    eventID=trans_obj['eventId']
+    eventId=trans_obj['eventId']
     institution_identifier=0
-    eventDevice=0
+    eventID=0
     eventName=''
     # find event of the institution that is using the device for paying
-    event_doc = db.collection(u'institutions').document(institution_id).collection('events').where('eventId','==',eventID).get()
+    event_doc = db.collection(u'institutions').document(institution_id).collection('events').where('eventId','==',eventId).get()
     
     # Find identifier of institution
     inst_doc=db.collection(u'institutions').document(institution_id).get()
@@ -48,8 +48,8 @@ def send_to_firebase_and_messages(tickets,trans_obj,tr_type):
     #createInstitutionTransaction(trans_obj=trans_obj, inst_id=institution_id)
     create_ticket=True
     if len(event_doc)>0:
-        create_ticket=createInstitutionEventTransaction(trans_obj=trans_obj, inst_id=institution_id,event_id=eventID)
-        eventDevice=event_doc[0].to_dict()['eventDevice']
+        create_ticket=createInstitutionEventTransaction(trans_obj=trans_obj, inst_id=institution_id,event_id=event_doc[0].id)
+        eventID=event_doc[0].to_dict()['eventID']
         eventName=event_doc[0].to_dict()['name']
     if create_ticket==False:
         print("We couldn't create ticket due to the transaction number that is alread exist"+trans_obj['paymentNumber'])
@@ -73,7 +73,7 @@ def send_to_firebase_and_messages(tickets,trans_obj,tr_type):
         for ticket in tickets:
                 #createInstitutionTickets(ticket=ticket, inst_id=institution_id)
                 if len(event_doc)>0:
-                    createInstitutionEventTickets(ticket=ticket, inst_id=institution_id,event_id=eventID)
+                    createInstitutionEventTickets(ticket=ticket, inst_id=institution_id,event_id=event_doc[0].id)
                     if len(tickets) > 1:
                         if ticket["phone"]!="N/A":
                             send_message(ticket["phone"], ticket["ticketNumber"],inst_identifier=institution_identifier,event_id=eventID,event_name=eventName)
@@ -142,41 +142,39 @@ def send_to_firebase_and_message2(tickets,trans_obj,tr_type,number_of_allowed_ti
                 send_message(trans_obj["phone"], ticket["ticketNumber"])
                 # Send message to reason phone
                 send_message(reason_phone, ticket["ticketNumber"])
-
-
 class AddTicketCategory(GenericAPIView):
-    # endpoint to create TicketCategory
-    serializer_class=serializers.TicketCategorySerializer
-    authentication_classes=(FirebaseAuthentication,)
-    def post(self,request,institution_id,event_id):
-        category_data={
+    serializer_class = serializers.TicketCategorySerializer
+    authentication_classes = (FirebaseAuthentication,)
+
+    def post(self, request, institution_id, event_id):
+        category_data = {
             'category_id': self.request.data['category_id'],
-            'name':self.request.data['name'],
-            'amount':self.request.data['amount'],
+            'name': self.request.data['name'],
+            'amount': self.request.data['amount'],
             'quantity': self.request.data['quantity'],
-            'group_quantity':self.request.data['group_quantity'],
-            'is_free':self.request.data['is_free'],
-            'is_group':self.request.data['is_group']
+            'group_quantity': self.request.data['group_quantity'],
+            'is_free': self.request.data['is_free'],
+            'is_group': self.request.data['is_group']
         }
-        cat_id=request.data['category_id']
-        event_ref=db.collection("institutions").document(institution_id).collection("events")
-        docs=event_ref.document(event_id).collection("ticket_category").get()
-        if len(docs)==0:
+        cat_id = self.request.data['category_id']
+        event_ref = db.collection("institutions").document(institution_id).collection("events")
+        docs = event_ref.document(event_id).collection("ticket_category").get()
+
+        if len(docs) == 0:
             event_ref.document(event_id).collection("ticket_category").add(category_data)
+            return JsonResponse({'data': category_data}, status=status.HTTP_201_CREATED)
         else:
-            check=False
-            if len(docs)>0:
-                for doc in docs:
-                    data=doc.to_dict()
-                    if cat_id==data['category_id']:
-                        check=True
-                        break
-                if check:
-                    return Response(data={'data':"category_id already exist"})
-                else:
-                    event_ref.document(event_id).collection("ticket_category").add(category_data)
-                    return Response(data={'data':category_data},status=status.HTTP_201_CREATED)
-    
+            check = False
+            for doc in docs:
+                data = doc.to_dict()
+                if cat_id == data['category_id']:
+                    check = True
+                    break
+            if check:
+                return JsonResponse({'data': "category_id already exist"}, status=status.HTTP_400_BAD_REQUEST)
+            else:
+                event_ref.document(event_id).collection("ticket_category").add(category_data)
+                return JsonResponse({'data': category_data}, status=status.HTTP_201_CREATED)
 class GetAlleventTicketCategory(APIView):
     # Endpoint for get all ticket_categories  of an event
     authentication_classes=(FirebaseAuthentication,)
@@ -207,17 +205,27 @@ class UpdateTicketCategory(GenericAPIView):
     serializer_class=serializers.TicketCategorySerializer
     authentication_classes=(FirebaseAuthentication,)
     def put(self,request,institution_id,event_id,categ_id):
+        categoryId = request.data.get('category_id')
         category_data={
-            'category_id': self.request.data['category_id'],
-            'name':self.request.data['name'],
-            'amount':self.request.data['amount'],
-            'quantity': self.request.data['quantity'],
-            'group_quantity':self.request.data['group_quantity'],
-            'is_free':self.request.data['is_free'],
-            'is_group':self.request.data['is_group']
+            'category_id':request.data.get('category_id'),
+            'name':request.data.get('name'),
+            'amount':request.data.get('amount'),
+            'quantity': request.data.get('quantity'),
+            'group_quantity':request.data.get('group_quantity'),
+            'is_free':request.data.get('is_free'),
+            'is_group':request.data.get('is_group')
         }
-        db.collection("institutions").document(institution_id).collection("events").document(event_id).collection("ticket_category").document(categ_id).update(category_data)
-        return Response(data={'data':category_data},status=status.HTTP_201_CREATED)
+
+        cate_doc=db.collection("institutions").document(institution_id).collection("events").document(event_id).collection("ticket_category").document(categ_id).get()
+        if cate_doc.exists:
+            data = cate_doc.to_dict()
+            if categoryId == data['category_id']:
+                db.collection("institutions").document(institution_id).collection("events").document(event_id).collection("ticket_category").document(categ_id).update(category_data)
+                return JsonResponse(data={'data':category_data},status=status.HTTP_201_CREATED)
+            else:
+                return JsonResponse(data={'data':" categoryId should be unique"})
+        else:
+             return JsonResponse(data={'data': "Ticket Category not found."})
       
 
 def create_ticket(data):
@@ -226,7 +234,7 @@ def create_ticket(data):
     # Find event on which a device is linked to and thus get single purchase amount
     institution_id = data['instId']
     event_id=data['eventId']
-    event_doc = db.collection("institutions").document(institution_id).collection("events").where('eventId','==',event_id).get()
+    event_doc = db.collection("institutions").document(institution_id).collection("events").where('eventID','==',event_id).get()
     singlePurchaseAmount=10000
 
     if len(event_doc)>0:
@@ -366,7 +374,6 @@ def create_ticket(data):
                     # if it's for free ticket
                     if ticketCategory_object['is_free']==True:
                         number_of_ticket=int(float(data['quantity']))
-
 
                     if number_of_ticket == 1:
                         # if len(ticketCategory_doc)>0:
@@ -562,7 +569,7 @@ class SaveTickets(GenericAPIView):
             tickets = create_ticket(trans_obj)
             
         # Send data to firebase
-            SendSMSAndSaveData1(tickets, trans_obj, "INDIVIDUAL").start()
+            SendSMSAndSaveData_V2(tickets, trans_obj, "INDIVIDUAL").start()
             return Response(data={"transaction":tickets})
 
 
@@ -587,4 +594,123 @@ class InvalidTicketsForEvent(GenericAPIView):
         ticket_ref=db.collection("institutions").document(inst_id).collection("events").document(eventId).collection("tickets").where('valid','==',False).get()
            
         return Response(data={"number of tickets":len(ticket_ref)})
+import os
+from ticket_app import settings
+from openpyxl import load_workbook
+from datetime import datetime
+import openpyxl
+from transactionsaver.serializers import BuyTicketsSerializer
+class GenerateTicketsFromExcel1(GenericAPIView):
+    serializer_class = serializers.FileUploadSerializer
 
+    def post(self, request, *args, **kwargs):
+        instId = request.data['instId']
+        eventId = request.data['eventId']
+        categ_id = request.data['categ_id']
+        file = request.data['file']
+
+        tickets = []
+        wb = openpyxl.load_workbook(file)
+        worksheet = wb["Sheet1"]
+
+        # Query the event document using eventID
+        event_docs = db.collection("institutions").document(instId).collection("events").where('eventID', '==', eventId).get()
+        if not event_docs:
+            return Response(data={'message': "Event does not exist"}, status=404)
+
+        event_doc_id = event_docs[0].id  # Get the document ID
+        ticket_cat_ref = db.collection("institutions").document(instId).collection("events").document(event_doc_id).collection("ticket_category").where('category_id','==',categ_id)
+        docs = ticket_cat_ref.get()
+
+        if len(docs)>0:
+            tc_obj = docs[0].to_dict()
+            categ_amount = tc_obj.get('amount', 0)
+
+            for row in worksheet.iter_rows(min_row=2):
+                trans_obj = {
+                    "transactionNumber": row[0].value,
+                    "sender": row[1].value,
+                    "senderPhone": row[2].value,
+                    "transactionTime": row[3].value,
+                    "amount": row[4].value,
+                    "referenceNumber": tc_obj['category_id'],
+                    "institution_id": instId,
+                    'eventId': eventId
+                }
+
+                # Add transaction to the transactions subcollection of the event document
+                db.collection("institutions").document(instId).collection("events").document(event_doc_id).collection("transactions").add(trans_obj)
+                
+                if row[4].value is not None:
+                    number_of_ticket = int(row[4].value) / int(categ_amount)
+                            
+                    for i in range(int(number_of_ticket)):
+                        ticket_obj = {
+                            "name": row[1].value,
+                            "phone": str(row[2].value),
+                            "amount": 10000,
+                            "paymentNumber": str(row[0].value),
+                            "paymentTime": datetime.today().strftime('%Y-%m-%d-%H:%M:%S'),
+                            "reason": "Buying Ticket",
+                            "valid": True,
+                            "validatedAt": "",
+                            'ticketNumber': str(get_ticket_number()),
+                            'singlePurchaseAmount': 10000,
+                            "instId": instId,
+                            'eventId': eventId
+                        }
+                        tickets.append(ticket_obj)
+
+            SendSMSAndSaveData_V2(tickets, tickets[0], "EXCEL").start()
+            return Response({"tickets": tickets}, status=200)
+        else:
+            return Response(data={'message': "Ticket category does not exist"}, status=404)
+
+from django.shortcuts import render
+    
+def get_all_event_ticketCategories(request, institution_id, event_id):
+    # method for getting all ticketCategories of event ,and render them to categories page.
+    results = db.collection("institutions").document(institution_id).collection("events").document(event_id).collection("ticket_category").get()
+    categories = []
+    for doc in results:
+        ticket_categ_id = doc.id
+        ticketCateg_data = doc.to_dict()
+        data = {
+            'categ_id':ticket_categ_id,
+            'name': ticketCateg_data['name'],
+            'category_id': ticketCateg_data['category_id'],
+            'amount': ticketCateg_data['amount'],
+            'group_quantity': ticketCateg_data['group_quantity'],
+            'quantity': ticketCateg_data['quantity'],
+            'is_free': ticketCateg_data['is_free'],
+            'is_group': ticketCateg_data['is_group']
+        }
+        categories.append(data)
+    return render(request, 'categories.html', {'categories': categories, 'institution_id': institution_id, 'event_id': event_id})
+
+def get_event_ticket_category_detail(request, inst_id, event_id,categ_id):
+    """
+      This method is for getting ticket_category details  of event  and render them to the ticket_category details page .
+    """
+    response = db.collection("institutions").document(inst_id).collection("events").document(event_id).collection("ticket_category").document(categ_id).get()
+    data = None
+    if response.exists:
+        data=None
+        data=response.to_dict()
+    return render(request, 'event_ticket_category_details.html', {'category_data': data, 'inst_id': inst_id, 'event_id': event_id,'categ_id':categ_id})
+def update_event_ticket_categorise( request,institution_id,event_id,categ_id):
+    # this method is for  category update and render to ticketCategory update page
+    
+    response= db.collection("institutions").document(institution_id).collection("events").document(event_id).collection("ticket_category").document(categ_id).get()
+    resp=response.to_dict()
+    data={
+        'name':resp['name'],
+        'category_id':resp['category_id'],
+        'amount':resp['amount'],
+        'quantity':resp['quantity'],
+        'group_quantity':resp['group_quantity'],
+        'is_free':resp['is_free'],
+        'is_group':resp['is_group'],
+    }
+    
+    return render(request, 'update_event_ticket_categories.html',{'data':data,'institution_id':institution_id,'event_id':event_id,'categ_id':categ_id})

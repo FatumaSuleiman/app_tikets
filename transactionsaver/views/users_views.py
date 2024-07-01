@@ -33,7 +33,7 @@ class GenerateToken(GenericAPIView):
             "password":self.request.data['password'],
             "returnSecureToken":True
         }
-        r = requests.post('https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=' +settings.FIREBASE,data=data)
+        r = requests.post('https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=' +settings.FIREBASE_KEY,data=data)
         json = r.json()
         if 'error' in json and json['error'] is not None:
             return Response({'Error':"Invalid Username or Password"}, status.HTTP_400_BAD_REQUEST)

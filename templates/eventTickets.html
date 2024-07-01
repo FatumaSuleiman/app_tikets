@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    {% load static %}
+    {% load humanize %}
+    {% block title %}
+        <title>Tickets</title>
+    {% endblock %}
+
+    {% block additional_assets %}
+    <script src="{% static 'js/vue.js' %}"></script>
+    <script src="{% static 'js/axios.min.js' %}"></script>
+    {% endblock %}
+
+    <link rel="stylesheet" href="{% static 'css/style.css' %}">
+    <link rel="stylesheet" type="text/css" href="{% static 'css/argon.min.css' %}"/>
+
+    <script src="{% static 'vendor/jquery/jquery.min.js' %}"></script>
+    <script src="{% static 'vendor/bootstrap/js/bootstrap.bundle.min.js' %}"></script>
+    <script src="{% static 'vendor/bootstrap/js/bootstrap.min.js' %}"></script>
+</head>
+<body style="background-color:#eee">
+    <div class="row mx-1">
+        <div class="col-md-12">
+            <ul class="breadcrumb">
+                <li><a href="/institutions/home">Home</a></li>
+                <li><a href="/institutions/get_institutions">Institutions</a></li>
+            </ul>
+        </div>
+    </div>
+<div id="app" data-institution-id="{{ institution_id }}">
+    <div v-if="showForm" @submit.prevent="generateTicket">
+        <div class="card ml-3" style="width:60em;">
+            <div class="card-body">
+                <h3>Tickets</h3>
+                <form >
+                    <div class="row mb-3">
+                    <div class="col-md-6">
+                        <input type="text" class="form-control" placeholder="Sender" v-model="ticket.sender">
+                    </div>
+                    <div class="col-md-6">
+                        <input type="text" class="form-control" placeholder="SenderPhone" v-model="ticket.senderPhone">
+                    </div>
+                </div>
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <input type="text" class="form-control" placeholder="Amount" v-model="ticket.amount">
+                    </div>
+                    <div class="col-md-6">
+                        <input type="text" class="form-control" placeholder="Transaction Number" v-model="ticket.transactionNumber">
+                    </div>
+                </div>
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <input type="text" class="form-control" placeholder="Transaction Time" v-model="ticket.transactionTime">
+                    </div>
+                    <div class="col-md-6">
+                        <input type="text" class="form-control" placeholder="Reference Number" v-model="ticket.referenceNumber">
+                    </div>
+                </div>
+                    <div class="row mt-3">
+                        <div class=" col-md-6">
+                            <span class="text-danger" v-if="errorMessage">[[errorMessage]]</span>
+                            <span class="text-success" v-if="successMessage">[[this.successMessage]]</span>
+                        <button type="submit" class="btn btn-warning form-control">Generate</button>
+                        </div>
+                        <div class="col-md-6">
+                        <button type="button" class="btn btn-secondary ml-2 form-control" @click="handleCancelButton">Cancel</button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    <!-- generate ticket by excel file -->
+    <div v-if="showTable" class="card ml-5" style="width:90em;">
+        <div class="card-body">
+            <div class="float-right mb-2">
+                <button class="btn btn-success" @click="handleAddNewTickets">Generate Ticket</button>
+            </div>
+            </div>
+            <h3 class="text-center">List of Tickets</h3>
+            <table class="table table-striped table-hover">
+                <thead>
+                    <tr>
+                        <th class="text-white bg-dark">No</th>
+                        <th class="text-white bg-dark">Name</th>
+                        <th class="text-white bg-dark">PaymentNumber</th>
+                        <th class="text-white bg-dark">Amount</th>
+                        <th class="text-white bg-dark">Phone</th>
+                        <th class="text-white bg-dark">Valid</th>
+                        <th class="text-white bg-dark">Validated</th>
+                        <th class="text-white bg-dark">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for t in tickets %}
+                    <tr>
+                        <td>{{ forloop.counter }}</td>
+                        <td>{{ t.name }}</td>
+                        <td>{{ t.paymentNumber }}</td>
+                        <td>{{ t.amount }}</td>
+                        <td>{{ t.phone }}</td>
+                        <td>{{ t.valid|yesno:"Yes,No" }}</td>
+                        <td>{{ t.validated }}</td>
+                        <td>
+                            <div style="display:flex; justify-content:space-between;">
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script>
+    new Vue({
+        el: '#app',
+        delimiters: ['[[', ']]'],
+        data: {
+            showForm: false,
+            showTable: true,
+            showExcelForm: false,
+            ticket: {
+                sender: '',
+                senderPhone: '',
+                amount: '',
+                transactionNumber: '',
+                transactionTime: '',
+                referenceNumber: ''
+            },
+            formData: {
+            instId: '',
+            eventId: '',
+            categ_id: '',
+            },
+            file: null,
+            errorMessage:'',
+            successMessage:''
+            
+        },
+        methods: {
+            viewForm() {
+                this.showForm = true;
+                this.showTable = false;
+            },
+            viewTable() {
+                this.showTable = true;
+                this.showForm = false;
+            },
+            handleAddNewTickets() {
+                this.viewForm();
+            },
+            handleCancelButton() {
+                this.viewTable();
+            },
+            generateTicket() {
+                const token = localStorage.getItem('token');
+                const institutionId = this.$el.getAttribute('data-institution-id');
+    
+                const url = `/tickets/ticket/generate_v2`;
+    
+                axios.post(url, this.ticket, {
+                    headers: {
+                        'X-CSRFToken': "{{ csrf_token }}",
+                        'Authorization': token
+                    }
+                })
+                .then(response => {
+                    this.successMessage = 'Tickets generated successfully';
+                    setTimeout(this.clearMessages,3000);
+                    this.ticket = {
+                        sender: '',
+                        senderPhone: '',
+                        amount: '',
+                        transactionNumber: '',
+                        transactionTime: '',
+                        referenceNumber: ''
+                    };
+                    this.viewTable();
+                })
+                .catch(error => {
+                    this.errorMessage =`Error generating Tickets:${error}`;
+                    setTimeout(this.clearMessages,3000);
+                });
+            },
+            clearMessages() {
+                this.successMessage = '';
+                this.errorMessage = '';
+        }
+          
+           
+        }
+    });
+    </script>
+    </body>
+    </html>

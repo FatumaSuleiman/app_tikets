@@ -15,7 +15,7 @@ from rest_framework import generics
 from firebase_connection import db
 from pindo.models import PindoSMS
 from ticket_app.settings import env
-from transactionsaver.serializers import TicketDataSerializer,EventDataSerializer,TicketsDataSerializer,BuyTicketsSerializer
+from transactionsaver.serializers import BuyTicketsSerializer, TicketDataSerializer,EventDataSerializer,SearchTicketBetweenDatesSerializer,SearchTicketByDateSerializer,TicketsDataSerializer
 import threading
 import re
 import smtplib
@@ -23,6 +23,8 @@ import os
 from email.message import EmailMessage
 from django.core.mail import send_mail
 from django.core.mail import EmailMultiAlternatives
+from transactionsaver.views.users_views import FirebaseAuthentication
+from datetime import date,datetime
 
 class SendSMSAndSaveData(threading.Thread):
     def __init__(self,tickets, transObj, tr_type):
@@ -38,129 +40,6 @@ class SendSMSAndSaveData(threading.Thread):
         """ Stopping the thread. """
         self._stopevent.set()
         threading.Thread.join(self, timeout)
-
-
-
-def send_to_firebase_and_message(tickets,trans_obj,tr_type):
-    """
-    this is the method to save the transaction and ticket of
-    a given institution (entity) to firebase and then
-    send the qr message to the corresponding user.
-    """
-
-    institution_id = trans_obj['instId']
-    device_id=trans_obj['deviceId']
-    institution_identifier=0
-    eventID=0
-    eventName=''
-    # find event of the institution that is using the device for paying
-    event_doc = db.collection(u'institutions').document(institution_id).collection('events').where('eventDevice','==',device_id).get()
-    
-    # Find identifier of institution
-    inst_doc=db.collection(u'institutions').document(institution_id).get()
-    ins_obj=inst_doc.to_dict()
-    institution_identifier=ins_obj['identifier']
-    #createInstitutionTransaction(trans_obj=trans_obj, inst_id=institution_id)
-    create_ticket=True
-    if len(event_doc)>0:
-        create_ticket=createInstitutionEventTransaction(trans_obj=trans_obj, inst_id=institution_id,event_id=event_doc[0].id)
-        eventID=event_doc[0].to_dict()['eventId']
-        eventName=event_doc[0].to_dict()['name']
-    if create_ticket==False:
-        print("We couldn't create ticket due to the transaction number that is alread exist"+trans_obj['paymentNumber'])
-    reason_phone=''
-    if is_email(trans_obj["reason"])==False:    
-        reason_phone = get_phone_fromReason(trans_obj["reason"])
-    if tr_type == "INSTITUTION" and create_ticket:
-        for ticket in tickets:
-            check_data = db.collection("tickets").where('paymentNumber', '==', ticket["paymentNumber"]).get()
-            #if len(check_data) == 0:
-            db.collection("tickets").add(ticket)
-            if len(tickets) > 1:
-                if ticket["phone"]!="N/A":
-                    send_message(ticket["phone"], ticket["ticketNumber"], inst_identifier=institution_identifier,event_id=eventID,event_name=eventName)
-            else:
-                if ticket["phone"]!="N/A":
-                    send_message(reason_phone, ticket["ticketNumber"],inst_identifier=institution_identifier,event_id=eventID,event_name=eventName)
-    elif tr_type == "INDIVIDUAL" and create_ticket:
-        #check_data = db.collection("tickets").where('paymentNumber', '==', trans_obj["paymentNumber"]).get()
-        #if len(check_data) == 0: 
-        for ticket in tickets:
-                #createInstitutionTickets(ticket=ticket, inst_id=institution_id)
-                if len(event_doc)>0:
-                    createInstitutionEventTickets(ticket=ticket, inst_id=institution_id,event_id=event_doc[0].id)
-                    if len(tickets) > 1:
-                        if ticket["phone"]!="N/A":
-                            send_message(ticket["phone"], ticket["ticketNumber"],inst_identifier=institution_identifier,event_id=eventID,event_name=eventName)
-                        
-                        if len(ticket["reason"])>1:
-                            send_ticket_in_email(ticket["reason"], ticket["ticketNumber"],inst_identifier=institution_identifier,event_id=eventID,event_name=eventName)
-                     
-                    else:
-                        if len(reason_phone)>9:
-                            if ticket["phone"]!="N/A":
-                                send_message(reason_phone, ticket["ticketNumber"],inst_identifier=institution_identifier,event_id=eventID,event_name=eventName)
-                            
-                            if len(ticket["reason"])>1:
-                                send_ticket_in_email(ticket["reason"], ticket["ticketNumber"],inst_identifier=institution_identifier,event_id=eventID,event_name=eventName)
-                     
-                        else:
-                            if ticket["phone"]!="N/A":
-                                send_message(ticket["phone"], ticket["ticketNumber"],inst_identifier=institution_identifier,event_id=eventID,event_name=eventName)
-                            
-                            if len(ticket["reason"])>1:
-                                send_ticket_in_email(ticket["reason"], ticket["ticketNumber"],inst_identifier=institution_identifier,event_id=eventID,event_name=eventName)
-                     
-    else:
-        for ticket in tickets:
-            if create_ticket:
-                createInstitutionTickets(ticket=ticket, inst_id=institution_id)
-            # db.collection("tickets").add(ticket)
-            if len(tickets) > 1:
-                if ticket["phone"]!="N/A" and create_ticket:
-                 send_message(ticket["phone"], ticket["ticketNumber"],inst_identifier=institution_identifier,event_id=eventID,event_name=eventName)
-            else:
-                if ticket["phone"]!="N/A" and create_ticket:
-                    send_message(reason_phone, ticket["ticketNumber"],inst_identifier=institution_identifier,event_id=eventID,event_name=eventName)
-
-
-
-
-
-def send_to_firebase_and_message1(tickets,trans_obj,tr_type,number_of_allowed_ticket):
-
-    reason_phone = get_phone_fromReason(trans_obj["reason"])
-    if tr_type == "INSTITUTION":
-        for ticket in tickets:
-            check_data = db.collection("tickets").where('paymentNumber', '==', ticket["paymentNumber"]).get()
-            if number_of_allowed_ticket> len(check_data) :
-                db.collection("tickets").add(ticket)
-                if len(tickets) > 1:
-                    send_message(ticket["phone"], ticket["ticketNumber"])
-                else:
-                    send_message(trans_obj["phone"], ticket["ticketNumber"])
-                        # Send message to reason phone
-                    #send_message(reason_phone, ticket["ticketNumber"])
-    elif tr_type == "INDIVIDUAL":
-        check_data = db.collection("tickets").where('paymentNumber', '==', trans_obj["paymentNumber"]).get()
-        if len(check_data) == 0:
-            for ticket in tickets:
-                db.collection("tickets").add(ticket)
-                if len(tickets) > 1:
-                    send_message(ticket["phone"], ticket["ticketNumber"])
-                else:
-                    send_message(trans_obj["phone"], ticket["ticketNumber"])
-                    # Send message to reason phone
-                    send_message(reason_phone, ticket["ticketNumber"])
-    else:
-        for ticket in tickets:
-            db.collection("tickets").add(ticket)
-            if len(tickets) > 1:
-                send_message(ticket["phone"], ticket["ticketNumber"])
-            else:
-                send_message(trans_obj["phone"], ticket["ticketNumber"])
-                # Send message to reason phone
-                send_message(reason_phone, ticket["ticketNumber"])
 
 
 class SendSMSAndSaveData_V2(threading.Thread):
@@ -196,7 +75,6 @@ def send_to_firebase_and_message(tickets,trans_obj,tr_type):
     
     # Find identifier of institution
     inst_doc=db.collection(u'institutions').document(institution_id).get()
-
     ins_obj=inst_doc.to_dict()
     institution_identifier=ins_obj['identifier']
     #createInstitutionTransaction(trans_obj=trans_obj, inst_id=institution_id)
@@ -206,7 +84,7 @@ def send_to_firebase_and_message(tickets,trans_obj,tr_type):
         eventID=event_doc[0].to_dict()['eventId']
         eventName=event_doc[0].to_dict()['name']
     if create_ticket==False:
-        print("We couldn't create ticket due to the transaction number that is alread exist"+trans_obj['paymentNumber'])
+        print("We couldn't create ticket due to the transaction number that is alread exist "+trans_obj['paymentNumber'])
     reason_phone=''
     if is_email(trans_obj["reason"])==False:    
         reason_phone = get_phone_fromReason(trans_obj["reason"])
@@ -274,23 +152,23 @@ def send_to_firebase_and_message_v2(tickets,trans_obj,tr_type):
     institution_id = trans_obj['instId']
     eventId=trans_obj['eventId']
     institution_identifier=0
-    eventId=0
+    eventID=0
     eventName=''
     # find event of the institution that is using the device for paying
-    event_doc = db.collection(u'institutions').document(institution_id).collection('events').where('eventId','==',eventId).get()
+    event_doc = db.collection(u'institutions').document(institution_id).collection('events').where('eventID','==',eventId).get()
     
     # Find identifier of institution
     inst_doc=db.collection(u'institutions').document(institution_id).get()
-    ins_obj=inst_doc.to_dict()
-    institution_identifier=ins_obj['identifier']
-    print('1111111111111111111111111111111',institution_identifier)
+    if inst_doc.exists:   
+         ins_obj=inst_doc.to_dict()
+         institution_identifier=ins_obj['identifier']
+         print('111111111111111111111',institution_identifier)
     #createInstitutionTransaction(trans_obj=trans_obj, inst_id=institution_id)
     create_ticket=True
     if len(event_doc)>0:
-        create_ticket=createInstitutionEventTransaction(trans_obj=trans_obj, inst_id=inst_doc[0].id,event_id=event_doc[0].id)
-        eventId=event_doc[0].to_dict()['eventId']
+        create_ticket=createInstitutionEventTransaction(trans_obj=trans_obj, inst_id=institution_id,event_id=event_doc[0].id)
+        eventID=event_doc[0].to_dict()['eventID']
         eventName=event_doc[0].to_dict()['name']
-        print('111111111111',eventName)
     if create_ticket==False:
         print("We couldn't create ticket due to the transaction number that is alread exist"+trans_obj['paymentNumber'])
     reason_phone=''
@@ -306,7 +184,7 @@ def send_to_firebase_and_message_v2(tickets,trans_obj,tr_type):
                     send_message(ticket["phone"], ticket["ticketNumber"], inst_identifier=institution_identifier,event_id=eventID,event_name=eventName)
             else:
                 if ticket["phone"]!="N/A":
-                    send_message(reason_phone, ticket["ticketNumber"],inst_identifier=institution_identifier,event_id=eventId,event_name=eventName)
+                    send_message(reason_phone, ticket["ticketNumber"],inst_identifier=institution_identifier,event_id=eventID,event_name=eventName)
     elif tr_type == "INDIVIDUAL" and create_ticket:
         #check_data = db.collection("tickets").where('paymentNumber', '==', trans_obj["paymentNumber"]).get()
         #if len(check_data) == 0: 
@@ -316,25 +194,25 @@ def send_to_firebase_and_message_v2(tickets,trans_obj,tr_type):
                     createInstitutionEventTickets(ticket=ticket, inst_id=institution_id,event_id=event_doc[0].id)
                     if len(tickets) > 1:
                         if ticket["phone"]!="N/A":
-                            send_message(ticket["phone"], ticket["ticketNumber"],inst_identifier=institution_identifier,event_id=eventId,event_name=eventName)
+                            send_message(ticket["phone"], ticket["ticketNumber"],inst_identifier=institution_identifier,event_id=eventID,event_name=eventName)
                         
                         if len(ticket["reason"])>1:
-                            send_ticket_in_email(ticket["reason"], ticket["ticketNumber"],inst_identifier=institution_identifier,event_id=eventId,event_name=eventName)
+                            send_ticket_in_email(ticket["reason"], ticket["ticketNumber"],inst_identifier=institution_identifier,event_id=eventID,event_name=eventName)
                      
                     else:
                         if len(reason_phone)>9:
                             if ticket["phone"]!="N/A":
-                                send_message(reason_phone, ticket["ticketNumber"],inst_identifier=institution_identifier,event_id=eventId,event_name=eventName)
+                                send_message(reason_phone, ticket["ticketNumber"],inst_identifier=institution_identifier,event_id=eventID,event_name=eventName)
                             
                             if len(ticket["reason"])>1:
-                                send_ticket_in_email(ticket["reason"], ticket["ticketNumber"],inst_identifier=institution_identifier,event_id=eventId,event_name=eventName)
+                                send_ticket_in_email(ticket["reason"], ticket["ticketNumber"],inst_identifier=institution_identifier,event_id=eventID,event_name=eventName)
                      
                         else:
                             if ticket["phone"]!="N/A":
-                                send_message(ticket["phone"], ticket["ticketNumber"],inst_identifier=institution_identifier,event_id=eventId,event_name=eventName)
+                                send_message(ticket["phone"], ticket["ticketNumber"],inst_identifier=institution_identifier,event_id=eventID,event_name=eventName)
                             
                             if len(ticket["reason"])>1:
-                                send_ticket_in_email(ticket["reason"], ticket["ticketNumber"],inst_identifier=institution_identifier,event_id=eventId,event_name=eventName)
+                                send_ticket_in_email(ticket["reason"], ticket["ticketNumber"],inst_identifier=institution_identifier,event_id=eventID,event_name=eventName)
                      
     else:
         for ticket in tickets:
@@ -343,10 +221,49 @@ def send_to_firebase_and_message_v2(tickets,trans_obj,tr_type):
             # db.collection("tickets").add(ticket)
             if len(tickets) > 1:
                 if ticket["phone"]!="N/A" and create_ticket:
-                 send_message(ticket["phone"], ticket["ticketNumber"],inst_identifier=institution_identifier,event_id=eventId,event_name=eventName)
+                 send_message(ticket["phone"], ticket["ticketNumber"],inst_identifier=institution_identifier,event_id=eventID,event_name=eventName)
             else:
                 if ticket["phone"]!="N/A" and create_ticket:
-                    send_message(reason_phone, ticket["ticketNumber"],inst_identifier=institution_identifier,event_id=eventId,event_name=eventName)
+                    send_message(reason_phone, ticket["ticketNumber"],inst_identifier=institution_identifier,event_id=eventID,event_name=eventName)
+
+
+
+
+def send_to_firebase_and_message1(tickets,trans_obj,tr_type,number_of_allowed_ticket):
+
+    reason_phone = get_phone_fromReason(trans_obj["reason"])
+    if tr_type == "INSTITUTION":
+        for ticket in tickets:
+            check_data = db.collection("tickets").where('paymentNumber', '==', ticket["paymentNumber"]).get()
+            if number_of_allowed_ticket> len(check_data) :
+                db.collection("tickets").add(ticket)
+                if len(tickets) > 1:
+                    send_message(ticket["phone"], ticket["ticketNumber"])
+                else:
+                    send_message(trans_obj["phone"], ticket["ticketNumber"])
+                        # Send message to reason phone
+                    #send_message(reason_phone, ticket["ticketNumber"])
+    elif tr_type == "INDIVIDUAL":
+        check_data = db.collection("tickets").where('paymentNumber', '==', trans_obj["paymentNumber"]).get()
+        if len(check_data) == 0:
+            for ticket in tickets:
+                db.collection("tickets").add(ticket)
+                if len(tickets) > 1:
+                    send_message(ticket["phone"], ticket["ticketNumber"])
+                else:
+                    send_message(trans_obj["phone"], ticket["ticketNumber"])
+                    # Send message to reason phone
+                    send_message(reason_phone, ticket["ticketNumber"])
+    else:
+        for ticket in tickets:
+            db.collection("tickets").add(ticket)
+            if len(tickets) > 1:
+                send_message(ticket["phone"], ticket["ticketNumber"])
+            else:
+                send_message(trans_obj["phone"], ticket["ticketNumber"])
+                # Send message to reason phone
+                send_message(reason_phone, ticket["ticketNumber"])
+
 
 
 
@@ -729,15 +646,16 @@ def create_tickets(data):
 
 def create_tickets_v2(data):
     tickets = []
-    # Find event on which a device isprint() linked to and thus get single purchase amount
+    # Find event on which a device is linked to and thus get single purchase amount
     institution_id = data['instId']
     eventId=data['eventId']
-    event_doc = db.collection(u'institutions').document(institution_id).collection('events').where('eventId','==',eventId).get()
+    event_doc = db.collection(u'institutions').document(institution_id).collection('events').where('eventID','==',eventId).get()
     singlePurchaseAmount=10000
-
+    print(data)
+    print(event_doc)
     if len(event_doc)>0:
         p_object=event_doc[0].to_dict()
-        singlePurchaseAmount=int(p_object['SinglePurchaseAmount'])
+        singlePurchaseAmount=int(p_object['singlePurchaseAmount'])
         print("This is category Id")
         print(data['ticketCategoryId'])
         ticketCategoryId=int(data['ticketCategoryId'])
@@ -923,13 +841,10 @@ def create_tickets_v2(data):
             else:
 
                 # Ticket category is not for group/table
-                if int(singlePurchaseAmount) <= 1 or int(singlePurchaseAmount) > int(data['amount']):
+                if singlePurchaseAmount <= 1 or singlePurchaseAmount > data['amount']:
                     number_of_ticket = 1
                 else:
-                    Amou=int(data['amount'])
-                    singleP=int(singlePurchaseAmount)
-                    number_of_ticket=Amou//singleP
-                    #number_of_ticket = int(data['amount'] / int(singlePurchaseAmount))
+                    number_of_ticket = int(data['amount'] / singlePurchaseAmount)
 
                 if number_of_ticket<1:
                     number_of_ticket=1 
@@ -1042,53 +957,6 @@ def create_tickets_v2(data):
 
 
     return tickets
-
-
-
-#Endpoint to generate tickets from payment api
-class AddTicketV2(generics.GenericAPIView):
-    serializer_class=BuyTicketsSerializer
-    def post(self,request):
-        seriazed_data = BuyTicketsSerializer(data=self.request.data)
-        if seriazed_data.is_valid():
-            trans_obj = seriazed_data.data
-            obj = seriazed_data.data
-            # Find key data from referenceNumber
-            referencenNumber=obj['referenceNumber']
-            if referencenNumber.__contains__("-"):
-                    parts=referencenNumber.split('-')
-                    if len(parts)==3:
-                        instId=parts[0]
-                        eventId=parts[1]
-                        ticketCategoryId=parts[2]
-                        trans_obj={
-                            'phone':obj['senderPhone'],
-                            'name':'',
-                            'paymentNumber':obj['transactionNumber'],
-                            'paymentTime':obj['transactionTime'],
-                            'amount':obj['amount'],
-                            'reason':'Buying Ticket',
-                            'validated':False,
-                            'instId':instId,
-                            'eventId':eventId,
-                            'ticketCategoryId':ticketCategoryId,
-                            'quantity':0
-                        }
-                        tickets = create_tickets_v2(trans_obj)
-                        # Send data to firebase
-                        SendSMSAndSaveData_V2(tickets, trans_obj, "INDIVIDUAL").start()
-                        # # Send sms to ticket buyer
-                        # SendTicketSMSs(tickets, transObj).start()
-
-                        return Response(data={"transaction":tickets})
-                    else:
-                        return Response(data={"data":seriazed_data.errors}, status=status.HTTP_400_BAD_REQUEST)
-            else:
-                return Response(data={"data":seriazed_data.errors}, status=status.HTTP_400_BAD_REQUEST)
-            
-        else:
-            return Response(data={"data":seriazed_data.errors}, status=status.HTTP_400_BAD_REQUEST)
-
 
 
 
@@ -1411,6 +1279,7 @@ def createInstitutionEventTickets(ticket,inst_id,event_id):
 #Service for event info for institution
 class FetchEventData(GenericAPIView):
     serializer_class=EventDataSerializer
+    authentication_classes=(FirebaseAuthentication,)
     def post(self,request):
         seriazed_data = EventDataSerializer(data=self.request.data)
         if seriazed_data.is_valid():
@@ -1422,14 +1291,14 @@ class FetchEventData(GenericAPIView):
             if len(institution_doc)>0:
                 p_object=institution_doc[0].to_dict()
                 #print(institution_doc[0].id)
-                event_doc = db.collection(u'institutions').document(institution_doc[0].id).collection('events').where('eventId','==',eventId).get()
+                event_doc = db.collection(u'institutions').document(institution_doc[0].id).collection('events').where('eventID','==',eventId).get()
                 if len(event_doc)>0:
                     e_object=event_doc[0].to_dict()
                     ticket_doc = db.collection(u'institutions').document(institution_doc[0].id).collection('events').document(event_doc[0].id).collection('tickets').where('ticketNumber','==',ticketNumber).get()
                     if len(ticket_doc)>0:
                         t_object=ticket_doc[0].to_dict()    
                         event={
-                            "venue":e_object['venue'],
+                            "eventLocation":e_object['eventLocation'],
                             "date":e_object['date'],
                             "name":e_object['name'],
                             "time":e_object['time'],
@@ -1443,6 +1312,8 @@ class FetchEventData(GenericAPIView):
                         return Response(data={"data":"no data found"}, status=status.HTTP_204_NO_CONTENT)
                 else:
                     return Response(data={"data":"no data found"}, status=status.HTTP_204_NO_CONTENT)
+            else:
+                return Response(data={'data':'no data found'},status=status.HTTP_204_NO_CONTENT)
 
 def EventStatisticData(request,institution_id,event_id):
     """
@@ -1503,7 +1374,6 @@ def EventStatisticData(request,institution_id,event_id):
             no_category_tickets=no_category_query.get()   
             no_category_valid_tickets=no_category_query.where('valid','==',True).get()
             no_category_in_valid_tickets=no_category_query.where('valid','==',False).get()         
-
         return render(request, 'event_statistic_data.html', {'ticket_scanned':ticket_scanned,'ticket_sold':ticket_sold,'total_sales':total_sales,'event':eventName,'eventLocation':eventLocation,'eventTime':eventTime,'eventDate':eventDate,'tickets_categories':all_ticket_categories,'no_category_tickets':len(no_category_tickets),'no_category_valid_tickets':len(no_category_valid_tickets),'no_category_in_valid_tickets':len(no_category_in_valid_tickets)})
     except Exception as e:
         print(e)
@@ -1550,3 +1420,171 @@ def is_email(content):
     if(re.fullmatch(regex, content)):
         check=True
     return check
+
+#Endpoint to generate tickets from payment api
+class AddTicketV2(generics.GenericAPIView):
+    serializer_class=BuyTicketsSerializer
+    authentication_classes=(FirebaseAuthentication,)
+    def post(self,request):
+        seriazed_data = BuyTicketsSerializer(data=self.request.data)
+        if seriazed_data.is_valid():
+            trans_obj = seriazed_data.data
+            obj = seriazed_data.data
+            # Find key data from referenceNumber
+            referencenNumber=obj['referenceNumber']
+            if referencenNumber.__contains__("_"):
+                    parts=referencenNumber.split('_')
+                    if len(parts)==3:
+                        instId=parts[0]
+                        eventId=parts[1]
+                        ticketCategoryId=parts[2]
+                        trans_obj={
+                            'phone':obj['senderPhone'],
+                            'name':obj['sender'],
+                            'paymentNumber':obj['transactionNumber'],
+                            'paymentTime':obj['transactionTime'],
+                            'amount':int(obj['amount']),
+                            'reason':'Buying Ticket',
+                            'validated':False,
+                            'instId':instId,
+                            'eventId':eventId,
+                            'ticketCategoryId':ticketCategoryId,
+                            'quantity':0
+                        }
+                        
+                        tickets = create_tickets_v2(trans_obj)
+                        # Send data to firebase
+                        SendSMSAndSaveData_V2(tickets, trans_obj, "INDIVIDUAL").start()
+                        # # Send sms to ticket buyer
+                        # SendTicketSMSs(tickets, transObj).start()
+
+                        return Response(data={"transaction":tickets},status=status.HTTP_201_CREATED)
+                    else:
+                        return Response(data={"data":seriazed_data.errors}, status=status.HTTP_400_BAD_REQUEST)
+            else:
+                return Response(data={"data":seriazed_data.errors}, status=status.HTTP_400_BAD_REQUEST)
+            
+        else:
+            return Response(data={"data":seriazed_data.errors}, status=status.HTTP_400_BAD_REQUEST)
+
+
+
+#Endpoint to generate tickets from payment api
+class AddTicketV3(generics.GenericAPIView):
+    serializer_class=BuyTicketsSerializer
+    authentication_classes=(FirebaseAuthentication,)
+    def post(self,request,institution_id,event_id):
+        seriazed_data = BuyTicketsSerializer(data=self.request.data)
+        if seriazed_data.is_valid():
+                        trans_obj = seriazed_data.data
+                        obj = seriazed_data.data
+                        # Find key data from referenceNumber
+                        referencenNumber=obj['referenceNumber']
+                        #ticketCategoryId=referencenNumber
+                        trans_obj={
+                            'phone':obj['senderPhone'],
+                            'name':obj['sender'],
+                            'paymentNumber':obj['transactionNumber'],
+                            'paymentTime':obj['transactionTime'],
+                            'amount':int(obj['amount']),
+                            'reason':'Buying Ticket',
+                            'validated':False,
+                            'instId':institution_id,
+                            'eventId':event_id,
+                            'ticketCategoryId':referencenNumber,
+                            'quantity':0
+                        }
+                        
+                        tickets = create_tickets_v2(trans_obj)
+                        # Send data to firebase
+                        SendSMSAndSaveData_V2(tickets, trans_obj, "INDIVIDUAL").start()
+                        # # Send sms to ticket buyer
+                        # SendTicketSMSs(tickets, transObj).start()
+
+                        return Response(data={"transaction":tickets},status=status.HTTP_201_CREATED)
+                            
+            
+        else:
+            return Response(data={"data":seriazed_data.errors}, status=status.HTTP_400_BAD_REQUEST)
+
+class GenerateTicketsBetweenDates(generics.GenericAPIView):
+    # this method is for generating tickets between dates.
+    serializer_class = SearchTicketBetweenDatesSerializer
+    authentication_classes = (FirebaseAuthentication,)
+    def post(self, *args, **kwargs):
+        instId = self.request.data['instId']
+        eventId = self.request.data['eventId']
+        start_date =date(1995, 1, 1)
+        end_date =date.today()
+        collection = db.collection("institutions").document(instId).collection("events").document(eventId).collection('tickets').get()
+        tickets = []
+
+        if len(collection) > 0: 
+            for doc in collection:
+                ticket = doc.to_dict()
+                paymentTime = ticket['paymentTime']
+                paymentDate = datetime.strptime(paymentTime, '%d.%m.%Y').date() 
+                if start_date <= paymentDate <= end_date:
+                    if ticket['valid']==True:
+                        data = {
+                            'amount': ticket['amount'],
+                            'name': ticket['name'],
+                            'paymentNumber': ticket['paymentNumber'],
+                            'paymentTime': ticket['paymentTime'],
+                            'phone': ticket['phone'],
+                            'reason': ticket['reason'],
+                            'singlePurchaseAmount': ticket['singlePurchaseAmount'],
+                            'ticketCategoryId': ticket['ticketCategoryId'],
+                            'ticketNumber': ticket['ticketNumber'],
+                            'valid': ticket['valid'],
+                            'validated': ticket['validated'],
+                            'validatedAt': ticket['validatedAt'],
+                            'validatedBy': ticket['validatedBy']
+                        }
+                        tickets.append(data)
+
+            return Response(data=tickets, status=status.HTTP_200_OK)
+        else:
+            return Response(data='tickets are not found', status=status.HTTP_400_BAD_REQUEST)
+    
+class GenerateTicketsFromStartDateToendDate(generics.GenericAPIView):
+    serializer_class = SearchTicketByDateSerializer
+    authentication_classes = (FirebaseAuthentication,)
+    # This method is for getting   all valid tickets during period of time.
+    def post(self, *args, **kwargs):
+        instId = self.request.data['instId']
+        eventId = self.request.data['eventId']
+        start_date = self.request.data['start_date']
+        end_date = self.request.data['end_date']
+        start_date1 = datetime.strptime(start_date, '%Y-%m-%d').date()
+        end_date1 = datetime.strptime(end_date, '%Y-%m-%d').date()
+        collection = db.collection("institutions").document(instId).collection("events").document(eventId).collection('tickets').get()
+        tickets = []
+
+        if len(collection) > 0:  
+            for doc in collection:
+                ticket = doc.to_dict()
+                paymentTime = ticket['paymentTime']
+                paymentDate = datetime.strptime(paymentTime, '%d.%m.%Y').date() 
+                if start_date1 <= paymentDate <= end_date1:
+                    if ticket['valid']==True:
+                        data = {
+                            'amount': ticket['amount'],
+                            'name': ticket['name'],
+                            'paymentNumber': ticket['paymentNumber'],
+                            'paymentTime': ticket['paymentTime'],
+                            'phone': ticket['phone'],
+                            'reason': ticket['reason'],
+                            'singlePurchaseAmount': ticket['singlePurchaseAmount'],
+                            'ticketCategoryId': ticket['ticketCategoryId'],
+                            'ticketNumber': ticket['ticketNumber'],
+                            'valid': ticket['valid'],
+                            'validated': ticket['validated'],
+                            'validatedAt': ticket['validatedAt'],
+                            'validatedBy': ticket['validatedBy']
+                        }
+                        tickets.append(data)
+
+            return Response(data=tickets, status=status.HTTP_200_OK)
+        else:
+            return Response(data='tickets are not found', status=status.HTTP_400_BAD_REQUEST)

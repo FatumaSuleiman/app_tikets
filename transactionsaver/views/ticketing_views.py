@@ -3,6 +3,7 @@ from django.shortcuts import render
 from firebase_connection import db
 from rest_framework import status
 from rest_framework.views import APIView
+from rest_framework.generics import GenericAPIView
 from rest_framework.response import Response
 from datetime import datetime
 import math
@@ -12,6 +13,7 @@ from openpyxl import Workbook
 from django.http import HttpResponse
 from ticket_app.settings import env
 from transactionsaver.views.users_views import FirebaseAuthentication
+from transactionsaver.serializers import SaveCardTransactionSerializer
 
 
 
@@ -105,7 +107,8 @@ def institution_event_stats(request, institution_id):
 
 
 
-class SaveCardTransaction(APIView):
+class SaveCardTransaction(GenericAPIView):
+    serializer_class =SaveCardTransactionSerializer
     """
         This Method is for checking the saving the card transaction before processing card payment,
         after card payment we use the transaction number saved in cardTransactions as payment 
@@ -340,3 +343,60 @@ class GetTicketsFromCategory(APIView):
         except Exception as e:
             print(e)
             return Response(data="Internal Server error", status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        
+def get_all_event_tickets(request, institution_id, event_id):
+    # this method is for getting all tickets of event and render them to the event tickets page.
+    print(f"Received request for institution_id: {institution_id}, event_id: {event_id}")
+    try:
+        results = db.collection("institutions").document(institution_id).collection("events").document(event_id).collection("tickets").get()
+    except Exception as e:
+        return HttpResponse(f"Error fetching tickets: {e}")
+
+    tickets = []
+    for doc in results:
+        ticket_data = doc.to_dict()
+        data = {
+            'ticket_id': doc.id,
+            'name': ticket_data['name'],
+            'phone': ticket_data['phone'],
+            'amount': ticket_data['amount'],
+            'paymentNumber': ticket_data['paymentNumber'],
+            'paymentTime': ticket_data['paymentTime'],
+            'valid': ticket_data['valid'],
+            'validated':ticket_data['validated']
+        }
+        tickets.append(data)
+    return render(request, 'eventTickets.html', {
+        'tickets': tickets,
+        'institution_id': institution_id,
+        'event_id': event_id,
+       
+    })
+def validate_ticket(request):
+    # This method is for validating ticket to render to the validate ticket page.
+    return render(request,'validate_ticket.html')
+class GetAllEventTickets(APIView):
+    # Endpoint for getting all tickets of an event
+    authentication_classes = (FirebaseAuthentication,)
+
+    def get(self, request, inst_id, event_id):
+        tickets = []
+        try:
+            results = db.collection("institutions").document(inst_id).collection("events").document(event_id).collection("tickets").get()
+            for doc in results:
+                ticket_data = doc.to_dict()
+                data = {
+                    'ticket_id': doc.id,
+                    'name': ticket_data['name'],
+                    'phone': ticket_data['phone'],
+                    'amount': ticket_data['amount'],
+                    'paymentNumber': ticket_data['paymentNumber'],
+                    'paymentTime': ticket_data['paymentTime'],
+                    'valid': ticket_data['valid'],
+                    'validated': ticket_data['validated']
+                }
+                tickets.append(data)
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        return Response(data=tickets, status=status.HTTP_200_OK)

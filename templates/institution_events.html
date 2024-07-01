@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    {% load static %}
+    {% load humanize %}
+    {% block title %}
+        <title>Events</title>
+    {% endblock %}
+
+    {% block additional_assets %}
+    <script src="{% static 'js/vue.js' %}"></script>
+    <script src="{% static 'js/axios.min.js' %}"></script>
+    {% endblock %}
+
+    <link rel="stylesheet" href="{% static 'css/style.css' %}">
+    <link rel="stylesheet" type="text/css" href="{% static 'css/argon.min.css' %}"/>
+
+    <script src="{% static 'vendor/jquery/jquery.min.js' %}"></script>
+    <script src="{% static 'vendor/bootstrap/js/bootstrap.bundle.min.js' %}"></script>
+    <script src="{% static 'vendor/bootstrap/js/bootstrap.min.js' %}"></script>
+</head>
+<body style="background-color:#eee">
+    <div class="row mx-1">
+        <div class="col-md-12">
+            <ul class="breadcrumb">
+                <li><a href="/institutions/home">Home</a></li>
+                <li><a href="/institutions/get_institutions">Institutions</a></li>
+            </ul>
+        </div>
+    </div>
+    <div id="app" data-institution-id="{{ institution_id }}">
+        <!-- Event Form -->
+        <div v-if="showForm" class="card ml-5" style="width:60em;">
+            <div class="card-body">
+                <h3>Event</h3>
+                <div></div>
+                <form  @submit.prevent="createEvent">
+                    <div class="row mb-3">
+                        <div class="col">
+                            <input type="text" class="form-control" placeholder="Name" v-model="newEvent.name">
+                        </div>
+                        <div class="col">
+                            <input type="text" class="form-control" placeholder="eventID" v-model="newEvent.eventID">
+                        </div>
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col">
+                            <input type="text" class="form-control" placeholder="EventDevice" v-model="newEvent.eventDevice">
+                        </div>
+                        <div class="col">
+                            <input type="text" class="form-control" placeholder="Callback URL" v-model="newEvent.call_back_url">
+                        </div>
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col">
+                            <input type="text" class="form-control" placeholder="Description" v-model="newEvent.description">
+                        </div>
+                        <div class="col">
+                            <input type="text" class="form-control" placeholder="EventLocation" v-model="newEvent.eventLocation">
+                        </div>
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col">
+                            <input type="text" class="form-control" placeholder="Active" v-model="newEvent.active">
+                        </div>
+                        <div class="col">
+                            <input type="text" class="form-control" placeholder="Date" v-model="newEvent.date">
+                        </div>
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col">
+                            <input type="text" class="form-control" placeholder="Time" v-model="newEvent.time">
+                        </div>
+                        <div class="col">
+                            <input type="text" class="form-control" placeholder="SinglePurchaseAmount" v-model="newEvent.singlePurchaseAmount">
+                        </div>
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col">
+                            <input type="text" class="form-control" placeholder="Unfinished_group_remaining_members" v-model="newEvent.unfinished_group_remaining_members">
+                        </div>
+                        <div class="col">
+                            <input type="text" class="form-control" placeholder="Current_group_number" v-model="newEvent.current_group_number">
+                        </div>
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col">
+                            <input type="text" class="form-control" placeholder="How_many_per_group" v-model="newEvent.how_many_per_group">
+                        </div>
+                        <div class="col">
+                            <input type="text" class="form-control" placeholder="MomoCode" v-model="newEvent.momoCode"> 
+                        </div>
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col">
+                            <input type="text" class="form-control" placeholder="Unfinished_group" v-model="newEvent.unfinished_group">
+                        </div>
+                        <div class="col">
+                            <input type="text" class="form-control" placeholder="Group_number_assignation_required" v-model="newEvent.group_number_assignation_required"> 
+                        </div>
+                    </div>
+                    <div class="row mt-3">
+                        <div class="col-md-6">
+                            <span class="text-danger" v-if="errorMessage">[[ errorMessage ]]</span>
+                            <span class="text-success" v-if="successMessage">[[ successMessage ]]</span>
+                        <button type="submit" class="btn btn-warning form-control">Create</button>
+                        </div>
+                        <div class="col-md-6">
+                        <button type="button" class="btn btn-secondary ml-2 form-control" @click="handleCancelButton">Cancel</button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Event Table -->
+        <div v-if="showTable" class="card ml-5" style="width:90rem;">
+            <div class="card-body">
+                <div class="float-right mb-2">
+                    <button class="btn btn-primary" @click="handleAddButtonClick">Add New Event</button>
+                </div>
+                <h3>Events List</h3>
+                <table class="table table-striped table-hover">
+                    <thead>
+                        <tr>
+                            <th class="text-white bg-dark">No</th>
+                            <th class="text-white bg-dark">Name</th>
+                            <th class="text-white bg-dark">eventID</th>
+                            <th class="text-white bg-dark">EventLocation</th>
+                            <th class="text-white bg-dark">Date</th>
+                            <th class="text-white bg-dark">Active</th>
+                            <th class="text-white bg-dark">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for e in events %}
+                        <tr>
+                            <td>{{ forloop.counter }}</td>
+                            <td>{{ e.name }}</td>
+                            <td>{{ e.eventID }}</td>
+                            <td>{{ e.eventLocation }}</td>
+                            <td>{{ e.date }}</td>
+                            <td>{{ e.active|yesno:"Yes,No" }}</td>
+                            <td>
+                                <div style="display:flex; justify-content:space-between;">
+                                    <a style="margin-right: 20px;" href="/institutions/{{institution_id}}/events/{{e.event_id}}">Details</a>
+                                    <a href="/institutions/{{institution_id}}/events/{{e.event_id}}/updateEvent">Update</a>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    new Vue({
+        el: '#app',
+        delimiters: ['[[', ']]'],
+        data: {
+            showForm: false,
+            showTable: true,
+            newEvent: {
+                name: '',
+                eventID: '',
+                eventDevice: '',
+                call_back_url: '',
+                eventLocation: '',
+                description: '',
+                active: '',
+                date: '',
+                time: '',
+                singlePurchaseAmount: '',
+                momoCode: '',
+                current_group_number: '',
+                how_many_per_group: '',
+                unfinished_group: '',
+                unfinished_group_remaining_members: '',
+                group_number_assignation_required: ''
+            },
+            existingEventIDs: [],
+            errorMessage:'',
+            successMessage:''
+        },
+        methods: {
+            viewForm() {
+                this.showForm = true;
+                this.showTable = false;
+            },
+            viewTable() {
+                this.showTable = true;
+                this.showForm = false;
+            },
+            handleAddButtonClick() {
+                this.viewForm();
+            },
+            handleCancelButton() {
+                this.viewTable();
+            },
+            createEvent() {
+                if (!this.newEvent.name || !this.newEvent.eventID) {
+                    this.errorMessage ='Name and EventID are required.';
+                    console.log(this.errorMessage)
+                    setTimeout(this.clearMessages,3000);
+                    return;
+                }
+                if (this.existingEventIDs.includes(this.newEvent.eventID)) {
+                    this.errorMessage ='EventID must be unique.';
+                    console.log(this.errorMessage)
+                    setTimeout(this.clearMessages,3000);
+                    return;
+                }
+                var token = localStorage.getItem('token');
+                var institutionId = this.$el.getAttribute('data-institution-id');
+                var url = `/events/createEvents/${institutionId}`;
+
+                axios.post(url, this.newEvent, {
+                    headers: {
+                        'X-CSRFToken': "{{ csrf_token }}",
+                        'Authorization': token
+                    }
+                })
+                .then(response => {
+                    this.successMessage ='Event created successfully';
+                    this.existingEventIDs.push(this.newEvent.eventID);
+                    setTimeout(this.clearMessages,3000);
+
+                    this.newEvent = {
+                        name: '',
+                        eventID: '',
+                        eventDevice: '',
+                        call_back_url: '',
+                        eventLocation: '',
+                        description: '',
+                        active: '',
+                        date: '',
+                        time: '',
+                        singlePurchaseAmount: '',
+                        momoCode: '',
+                        current_group_number: '',
+                        how_many_per_group: '',
+                        unfinished_group: '',
+                        unfinished_group_remaining_members: '',
+                        group_number_assignation_required: ''
+                    };
+
+                    this.viewTable();
+                })
+                .catch(error => {
+                    this.errorMessage =`Error creating event: ${error}`;
+                    console.log(this.errorMessage)
+                    setTimeout(this.clearMessages,3000);
+                });
+            },
+            clearMessages() {
+                this.successMessage = '';
+                this.errorMessage = '';
+        }
+        }
+    
+    });
+    </script>
+</body>
+</html>
